@@ -1,0 +1,39 @@
+{
+  // Set the name of the devcontainer
+  "name": "autodock-vina",
+  "build": {
+    // This assumes your Dockerfile is at:
+    // .../autodock_vina/.devcontainer/Dockerfile
+    "dockerfile": "Dockerfile"
+  },
+
+  // Specify run arguments
+  "runArgs": [
+    "--gpus", "all",
+    "--network", "host"
+  ],
+
+  // Specify where workspace directory is mounted in the devcontainer
+  "mounts": [
+    // Mount your whole git repo (e.g., 'my_project') to '/workspaces/my_project'
+    "source=${localWorkspaceFolderBasename},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+    // Mount the shared folder
+    "source=/shared,target=/shared,type=bind,consistency=cached"
+  ],
+
+  // Set the working directory inside the container
+  // This will open VS Code in this specific subfolder
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}/autodockvina",
+
+  // Add vscode extensions
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "ms-python.black-formatter"
+      ]
+    }
+  }
+}
