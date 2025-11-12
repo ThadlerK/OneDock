@@ -9,21 +9,21 @@
 
   // Specify run arguments
   "runArgs": [
-    "--gpus", "all",
+    // "--gpus", "all",
     "--network", "host"
   ],
 
   // Specify where workspace directory is mounted in the devcontainer
   "mounts": [
-    // Mount your whole git repo (e.g., 'my_project') to '/workspaces/my_project'
-    "source=${localWorkspaceFolderBasename},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+    // Mount your whole git repo (e.g., 'my_project') to '/workspace/my_project'
+    "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind,consistency=cached"
     // Mount the shared folder
-    "source=/shared,target=/shared,type=bind,consistency=cached"
+    // "source=/shared,target=/shared,type=bind,consistency=cached"
   ],
 
   // Set the working directory inside the container
   // This will open VS Code in this specific subfolder
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}/autodockvina",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
 
   // Add vscode extensions
   "customizations": {

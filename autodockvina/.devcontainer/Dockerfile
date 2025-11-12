@@ -1,17 +1,25 @@
-# Start from a clean miniconda base
 FROM continuumio/miniconda3:latest
 
-# Set non-interactive mode
-ENV DEBIAN_FRONTEND=noninteractive
+# Get common tools needed to download files
+RUN apt-get update && apt-get install -y wget && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Update conda, set up channels, and install autodock-vina
-# This single 'autodock-vina' package from conda-forge includes
-# the executables (vina, vina_split) AND the python library.
-RUN conda update -n base -c defaults conda && \
-    conda config --add channels conda-forge && \
-    conda config --set channel_priority strict && \
-    conda install -y autodock-vina && \
-    conda clean -a -y
+# Download the pre-compiled executable, rename it, and make it runnable
+RUN wget https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64 -O /usr/bin/vina && \
+    chmod +x /usr/bin/vina
 
-# Optional: Set a default command to show Vina's help
+# Create a dedicated conda environment for your Python tools.
+RUN conda create -n adtools -c conda-forge -y \
+    python=3.10 \
+    meeko \
+    rdkit \
+    numpy \
+    scipy \
+    gemmi \
+    prody
+
+# 3. Clean up the conda cache
+RUN conda clean -a -y
+
+# Now, 'vina' is "installed" and can be run from anywhere
 CMD ["vina", "--help"]
