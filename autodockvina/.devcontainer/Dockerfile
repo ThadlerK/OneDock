@@ -1,7 +1,7 @@
 FROM continuumio/miniconda3:latest
 
 # Get common tools needed to download files AND install tmux
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y git \
     wget \
     tmux && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
