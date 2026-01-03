@@ -38,6 +38,7 @@ RUN conda run -n adtools pip install \
     biobb_structure_utils \
     biobb_vs \
     py3Dmol \
+    ipython_genutils \
     stmol
 
 # 5. [CRITICAL] Make 'adtools' the default environment
@@ -52,4 +53,4 @@ COPY . .
 EXPOSE 8501
 
 # Correct CMD: Just run Streamlit
-CMD ["streamlit", "run", "app/main.py", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "app/Home.py", "--server.address=0.0.0.0"]

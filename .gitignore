@@ -1,2 +1,4 @@
 **/data/
 **/outputs/
+**/.snakemake/
+**/__pycache__
