@@ -17,6 +17,11 @@ my-pipeline-project/
 │   ├── main.py              # Main Streamlit app
 │   ├── utils.py             # Helper functions (e.g., parsing logs)
 │   └── pages/               # Multi-page Streamlit layout (optional)
+├── tools/
+│   ├── fpocket.py           # helper skript for fpocket()
+│   ├── P2Rank_filtering.py  # helper skript for P2Rank
+│   ├── P2Rank_to_PDB.py     # helper skript for P2Rank conversion
+│   └── pocket_comparison.py # helper skript for pocket_comparison
 ├── .gitignore
 ├── README.md
 └── requirements.txt         # Python dependencies for the Streamlit app
