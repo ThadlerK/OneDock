@@ -5,6 +5,8 @@ from utils import save_config
 import py3Dmol
 from stmol import showmol
 import subprocess
+from utils import reset_project
+import time
 
 st.set_page_config(page_title="OneDock Virtual Screening Pipeline", layout="wide")
 
@@ -81,3 +83,35 @@ if smiles_file:
 st.markdown("---")
 if st.button("Go to Structure Preparation"):
     st.switch_page("pages/1_Structure_Preparation.py")
+
+st.sidebar.markdown("---")
+
+# Initialize session state for the confirmation button
+if "confirm_reset" not in st.session_state:
+    st.session_state.confirm_reset = False
+
+def on_reset_click():
+    st.session_state.confirm_reset = True
+
+def on_confirm_click():
+    status = reset_project()
+    if status == "Success":
+        st.toast("Project reset successfully!", icon="🗑️")
+        time.sleep(1)
+        st.rerun() # Refresh the app to clear inputs from memory
+    else:
+        st.error(status)
+    st.session_state.confirm_reset = False
+
+# The Logic
+if not st.session_state.confirm_reset:
+    st.sidebar.button("🗑️ Reset All Data", on_click=on_reset_click, type="primary")
+else:
+    st.sidebar.warning("Are you sure? This will delete all inputs and results.")
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        st.button("Yes, Delete", on_click=on_confirm_click, type="primary")
+    with col2:
+        if st.button("Cancel"):
+            st.session_state.confirm_reset = False
+            st.rerun()
