@@ -1,32 +1,39 @@
 import streamlit as st
 from utils import save_config
+import subprocess
 
-st.title("2️. Structure Preparation")
+st.title("Structure Preparation")
+st.subheader("Receptor conversion")
 
-# --- POCKET SELECTION ---
-st.subheader("Binding Pocket Configuration")
-pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], index=0)
+if st.button("Run Receptor Preparation"):
+    with st.spinner("Running Python Preparation Script..."):
+        target_output_file = "data/interim/receptor_ready.pdbqt"
+        
+        cmd = ["snakemake", "--cores", "1", target_output_file]
+        process = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if process.returncode == 0:
+            st.success("Preparation complete!")
+            # Visualization logic here...
+        else:
+            st.error("Preparation failed.")
+            st.code(process.stderr)
 
-if pocket_status == "Unknown":
-    st.warning("Pocket is unknown. You need to run prediction.")
-    if st.button("🔮 Go to Pocket Prediction"):
-        save_config({"pocket_known": False})
-        st.switch_page("pages/2_Pocket_Prediction.py")
+st.subheader("Ligand conversion")
 
-else:
-    st.info("Pocket is known. Please define coordinates.")
-    c1, c2, c3 = st.columns(3)
-    cx = c1.number_input("Center X", value=0.0)
-    cy = c2.number_input("Center Y", value=0.0)
-    cz = c3.number_input("Center Z", value=0.0)
-    
-    # Save coordinates instantly
-    save_config({
-        "pocket_known": True,
-        "center_x": cx, 
-        "center_y": cy, 
-        "center_z": cz
-    })
-    
-    if st.button("Confirm & Proceed to Docking ➡️"):
-        st.switch_page("pages/3_Docking.py")
+if st.button("Run Ligand Preparation"):
+    with st.spinner("Converting all ligands to PDBQT..."):
+
+        target_rule = "prepare_all_ligands"
+        
+        # We pass the rule name directly to snakemake
+        cmd = ["snakemake", "--cores", "1", target_rule]
+        
+        process = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if process.returncode == 0:
+            st.success("All ligands converted successfully!")
+        else:
+            st.error("Ligand Preparation failed.")
+            with st.expander("Error Log"):
+                st.code(process.stderr)

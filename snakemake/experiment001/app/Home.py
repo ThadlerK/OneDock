@@ -11,6 +11,7 @@ st.set_page_config(page_title="OneDock Virtual Screening Pipeline", layout="wide
 # Ensure directories exist
 os.makedirs("data/inputs", exist_ok=True)
 
+
 st.title("1️. Input & Visualization")
 st.sidebar.success("Current Step: Input")
 
@@ -45,20 +46,6 @@ if structure_known == "Yes":
         # view.zoomTo()
         # showmol(view, height=400, width=800)
 
-        if st.button("Run Preparation"):
-            with st.spinner("Running Python Preparation Script..."):
-                target_output_file = "data/interim/target.pdbqt"
-                
-                cmd = ["snakemake", "--cores", "1", target_output_file]
-                process = subprocess.run(cmd, capture_output=True, text=True)
-                
-                if process.returncode == 0:
-                    st.success("Preparation complete!")
-                    # Visualization logic here...
-                else:
-                    st.error("Preparation failed.")
-                    st.code(process.stderr)
-
 else:
     st.warning("Structure Unknown")
     if st.button("🧬 Run BioEmu Prediction"):
@@ -66,18 +53,31 @@ else:
         # In real life: subprocess.run(["snakemake", "bioemu_target"])
 
 # --- B. LIGAND LIBRARY ---
+os.makedirs("data/inputs/library_split", exist_ok=True)
+
 st.markdown("---")
 st.subheader("B. Ligand Library")
 smiles_file = st.file_uploader("Upload Ligand Library (.smi / .csv)", type=["smi", "csv"])
 
 if smiles_file:
-    lib_path = os.path.join("data/inputs", "library.smi")
-    with open(lib_path, "wb") as f:
-        f.write(smiles_file.getbuffer())
-    save_config({"ligand_library": lib_path})
-    st.success("Library Saved.")
+   # 1. Read the file
+    content = smiles_file.getvalue().decode("utf-8")
+    lines = [line.strip() for line in content.split('\n') if line.strip()]
+    
+    st.info(f"Found {len(lines)} ligands. Splitting files...")
+    
+    # 2. Split into individual files
+    for i, line in enumerate(lines):
+        smi = line.split()[0]
+        fname = f"lig_{i:05d}.smi"
+        fpath = os.path.join("data/inputs/library_split", fname)
+        
+        with open(fpath, "w") as f:
+            f.write(smi)
+            
+    st.success(f"✅ Successfully created {len(lines)} input files in 'data/inputs/library_split/'")
 
 # --- NAVIGATION ---
 st.markdown("---")
-if st.button("Go to Structure Preparation ➡️"):
+if st.button("Go to Structure Preparation"):
     st.switch_page("pages/1_Structure_Preparation.py")
