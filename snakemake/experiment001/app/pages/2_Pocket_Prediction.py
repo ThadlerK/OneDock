@@ -203,7 +203,6 @@ if st.session_state.pocket_unknown == True:
             and the directory you want the output to be stored in:')
 
     #inputs
-    path_P2Rank = st.text_input(label = 'path to P2Rank file')
     path_output_P2Rank = Path(output_path) / 'P2Rank_output'
 
     st.write('Here you can set the parameters for P2Rank.')
@@ -237,11 +236,9 @@ if st.session_state.pocket_unknown == True:
         with open(pdb_path, "wb") as f:
             f.write(pdb_file.getbuffer())
 
-        if path_P2Rank == '':
-            st.warning('please provide path to the P2Rank file')
-        if path_P2Rank != '' and path_output_P2Rank != '':
+        if  path_output_P2Rank != '':
             subprocess.run(
-                [path_P2Rank, "predict", "-f", pdb_path, "-o", str(path_output_P2Rank)],
+                ["/opt/p2rank_2.5.1/prank", "predict", "-f", pdb_path, "-o", str(path_output_P2Rank)],
                 check=True
             )
             filter_P2Rank(

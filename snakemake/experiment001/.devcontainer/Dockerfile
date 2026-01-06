@@ -6,22 +6,30 @@ RUN apt-get update && apt-get install -y \
     wget \
     tmux \
     build-essential \
+    openjdk-17-jre-headless \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Install AutoDock Vina (Binary) and P2Rank
-# We put it in /usr/bin so it's globally available
-RUN wget https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64 -O /usr/bin/vina && \
-    chmod +x /usr/bin/vina
+
+# 2. Install AutoDock Vina and P2Rank
+RUN wget https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64 \
+    -O /usr/bin/vina && chmod +x /usr/bin/vina
 
 RUN wget https://github.com/rdk/p2rank/releases/download/2.5.1/p2rank_2.5.1.tar.gz \
-        -O /tmp/p2rank.tar.gz && \
-    tar -xzf /tmp/p2rank.tar.gz -C /opt && \
-    ln -s /opt/p2rank_2.5.1/p2rank.sh /usr/bin/p2rank && \
-    rm /tmp/p2rank.tar.gz
+    -O /tmp/p2rank.tar.gz && \
+    mkdir -p /opt && \
+    tar -xzf /tmp/p2rank.tar.gz -C /tmp && \
+    mv /tmp/p2rank_2.5.1 /opt/ && \
+    chmod +x /opt/p2rank_2.5.1/prank && \
+    ln -sf /opt/p2rank_2.5.1/prank /usr/bin/p2rank && \
+    rm -rf /tmp/p2rank.tar.gz
 
-# 3. Create the Conda Environment
-# We install Streamlit and Snakemake HERE so they can see the bio-tools
-RUN conda create -n adtools -c conda-forge -c bioconda -y \
+
+# 3. Make conda non-interactive and up-to-date
+RUN conda update -n base -c defaults -y conda && \
+    conda config --set always_yes yes --set changeps1 no
+
+# 4. Create the Conda environment
+RUN conda create -n adtools -c conda-forge -c bioconda \
     python=3.10 \
     meeko \
     rdkit \
@@ -37,27 +45,26 @@ RUN conda create -n adtools -c conda-forge -c bioconda -y \
     biobb_structure_utils \
     snakemake \
     streamlit \
-    pip 
+    biopython \
+    pip
 
-# 4. Install Pip Packages into the 'adtools' environment
-# Using 'conda run' ensures they go into the right place
-RUN conda run -n adtools pip install \
+# 5. Install pip packages
+RUN /opt/conda/envs/adtools/bin/pip install \
     biobb_vs \
     py3Dmol \
     ipython_genutils \
     stmol
 
-# 5. [CRITICAL] Make 'adtools' the default environment
-# By adding the environment's bin folder to PATH, we "activate" it permanently.
+# 6. Clean conda caches (IMPORTANT)
+RUN conda clean -afy
+
+# 7. Activate adtools by default
 ENV PATH="/opt/conda/envs/adtools/bin:$PATH"
 
-# 6. Setup App
+# 8. Setup app
 WORKDIR /app
 COPY . .
 
-# 7. Final Config
+# 9. Final config
 EXPOSE 8501
-
-CMD ["bash"]
-# Correct CMD: Just run Streamlit
-#CMD ["streamlit", "run", "app/Home.py", "--server.address=0.0.0.0"]
+CMD

@@ -1,4 +1,6 @@
 # app/Home.py
+#streamlit run app/Home.py --server.address=0.0.0.0 --server.port=8501
+
 import streamlit as st
 import os
 from utils import save_config

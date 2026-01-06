@@ -11,7 +11,9 @@
   // -----------------------------
   // Use prebuilt Docker image
   // -----------------------------
-  "image": "heidelbergteam2:latest",
+"build": {
+  "dockerfile": "Dockerfile"
+},
 
   // -----------------------------
   // Optional run args for clusters
