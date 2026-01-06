@@ -1,0 +1,11 @@
+2026-01-05 18:49:57,542 [ScriptRunner] [INFO ]  Module: biobb_vs.fpocket.fpocket_run Version: 5.1.0
+2026-01-05 18:49:57,542 [ScriptRunner] [INFO ]  /home/sylviane/meet-eu/Heidelberg_Team_2-1/Heidelberg_Team_2/sandbox_720c773c-b238-4bbe-80bd-19d90c6d587a directory successfully created
+2026-01-05 18:49:57,544 [ScriptRunner] [INFO ]  Copy: /home/sylviane/meet-eu/Heidelberg_Team_2-1/Heidelberg_Team_2/snakemake/experiment001/temp/8WM3_Tiagabine_ACE2.pdb to /home/sylviane/meet-eu/Heidelberg_Team_2-1/Heidelberg_Team_2/sandbox_720c773c-b238-4bbe-80bd-19d90c6d587a
+2026-01-05 18:49:57,545 [ScriptRunner] [INFO ]  Creating a0d393ee-d96f-4a40-93cb-a5db93757c6c temporary folder
+2026-01-05 18:49:57,546 [ScriptRunner] [INFO ]  Executing fpocket
+2026-01-05 18:49:57,546 [ScriptRunner] [INFO ]  fpocket -f a0d393ee-d96f-4a40-93cb-a5db93757c6c/input.pdb -m 3 -M 6 -i 35
+
+2026-01-05 18:49:57,550 [ScriptRunner] [INFO ]  Executing: fpocket -f a0d393ee-d96f-4a40-93cb-a5db93757c6c/input.pdb -m 3 -M 6 -i 35...
+2026-01-05 18:49:57,550 [ScriptRunner] [INFO ]  Exit code: 127
+2026-01-05 18:49:57,551 [ScriptRunner] [INFO ]  Removing temporary folder: a0d393ee-d96f-4a40-93cb-a5db93757c6c
+2026-01-05 18:49:57,551 [ScriptRunner] [INFO ]  FPocketRun: Error executing fpocket, please check your properties
