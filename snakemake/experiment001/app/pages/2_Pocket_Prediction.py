@@ -357,7 +357,7 @@ if st.session_state.pocket_unknown == True:
                         
                         try: #sicher gehen dass er nicht verkackt
                             one_letter = protein_letters_3to1[resname.capitalize()]
-                            residues.add(f'{one_letter}{resnum}')
+                            residues.add(f'{chain.id}{resnum}')
                         except KeyError:
                             pass
         st.write(','.join(sorted(residues)))
