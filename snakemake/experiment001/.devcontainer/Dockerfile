@@ -46,6 +46,8 @@ RUN conda create -n adtools -c conda-forge -c bioconda \
     snakemake \
     streamlit \
     biopython \
+    openmm \
+    pdbfixer \
     pip
 
 # 5. Install pip packages
@@ -53,7 +55,8 @@ RUN /opt/conda/envs/adtools/bin/pip install \
     biobb_vs \
     py3Dmol \
     ipython_genutils \
-    stmol
+    stmol \
+    bioemu
 
 # 6. Clean conda caches (IMPORTANT)
 RUN conda clean -afy
@@ -67,4 +70,4 @@ COPY . .
 
 # 9. Final config
 EXPOSE 8501
-CMD
+CMD ["streamlit", "run", "app/Home.py", "--server.port=8501", "--server.address=0.0.0.0"]

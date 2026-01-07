@@ -16,7 +16,7 @@ st.set_page_config(page_title="OneDock Virtual Screening Pipeline", layout="wide
 os.makedirs("data/inputs", exist_ok=True)
 
 
-st.title("1️. Input & Visualization")
+st.title("Input & Visualization")
 st.sidebar.success("Current Step: Input")
 
 # --- A. RECEPTOR SELECTION ---
@@ -26,6 +26,7 @@ structure_known = st.radio("Is the PDB structure of the receptor known?", ["Yes"
 receptor_path = None
 
 if structure_known == "Yes":
+    save_config({"structure_known": True})
     c1, c2 = st.columns(2)
     with c1:
         target_file = st.file_uploader("Upload Target Receptor (.pdb)", type="pdb")
@@ -51,10 +52,31 @@ if structure_known == "Yes":
         # showmol(view, height=400, width=800)
 
 else:
-    st.warning("Structure Unknown")
-    if st.button("🧬 Run BioEmu Prediction"):
-        st.info("Triggering BioEmu... (Placeholder)")
-        # In real life: subprocess.run(["snakemake", "bioemu_target"])
+    st.info("Structure Unknown. Generate structures with Bioemu")
+    save_config({"structure_known": False})
+    uploaded_fasta = st.file_uploader("Upload Target FASTA", type=["fasta"])
+    if uploaded_fasta:
+        with open("data/inputs/target.fasta", "wb") as f:
+            f.write(uploaded_fasta.getbuffer())
+        if st.button(" Run BioEmu Prediction"):
+            target_output_pdb = "data/inputs/bioemu_target.pdb"
+            with st.spinner("BioEmu is generating structures... this may take a minute..."):
+                cmd = [
+                    "snakemake", 
+                    target_output_pdb,
+                    "--cores", "1", 
+                    "--configfile", "config/config.yaml"
+                ]
+
+                process = subprocess.run(cmd, capture_output=True, text=True)
+                if process.returncode == 0:
+                    st.success("Structure generation complete!")
+                    save_config({"receptor_path": target_output_pdb})
+                else:
+                    st.error("BioEmu generation failed.")
+                    with st.expander("See Error Log"):
+                        st.code(process.stderr)
+
 
 # --- B. LIGAND LIBRARY ---
 os.makedirs("data/inputs/library_split", exist_ok=True)

@@ -11,7 +11,7 @@ rule all:
 # Structure Preparation ---
 rule prepare_structure:
     input:
-        pdb = "data/inputs/target.pdb"
+        pdb = config.get("receptor_path", "data/inputs/target.pdb")
     output:
         output_pdbqt = "data/interim/receptor_ready.pdbqt"
     shell:
@@ -67,4 +67,24 @@ rule aggregate_results:
         if [ -n "{input}" ]; then
             tail -n +2 -q {input} >> {output}
         fi
+        """
+
+# --- BIOEMU STEP ---
+PYTHON_EXEC = "/opt/conda/envs/adtools/bin/python"
+
+rule run_bioemu_generation:
+    input:
+        fasta = "data/inputs/target.fasta"
+    output:
+        selected_pdb = "data/inputs/bioemu_target.pdb",
+        interim_dir = directory("data/interim/bioemu_workdir")
+    params:
+        samples = config.get("bioemu_samples", 10)
+    shell:
+        """
+        {PYTHON_EXEC} workflow/scripts/bioemu_pipeline.py \
+            --fasta {input.fasta} \
+            --working_dir {output.interim_dir} \
+            --output_pdb {output.selected_pdb} \
+            --samples {params.samples}
         """

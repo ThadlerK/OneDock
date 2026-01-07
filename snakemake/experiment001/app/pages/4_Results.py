@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.title("5️. Results & Ranking")
+st.title("Results & Ranking")
 
 result_file = "data/results/docking_report.csv"
 

@@ -2,3 +2,9 @@
 **/outputs/
 **/.snakemake/
 **/__pycache__
+**/output_fpocket
+snakemake/experiment001/log_1.out
+snakemake/experiment001/log_2.out
+snakemake/experiment001/log_3.out
+snakemake/experiment001/log.out
+snakemake/experiment001/SLC6A20_8I91_complete_occluded.pdb

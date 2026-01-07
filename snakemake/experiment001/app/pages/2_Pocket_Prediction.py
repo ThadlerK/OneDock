@@ -219,7 +219,7 @@ if st.session_state.pocket_unknown == True:
     with col3:
         P2rank_score = st.select_slider(label = 'minimum P2Rank score',
                                         options = list(range(0,101)),
-                                        value = 60)
+                                        value = 10)
     with col4:
         if P2rank_score < 40:
             st.error('low confidence pockets might be included')
