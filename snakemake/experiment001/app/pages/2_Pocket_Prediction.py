@@ -9,6 +9,8 @@ from tools.fpocket import run_fpocket
 from utils import save_config
 from glob import glob
 import re
+from Bio.PDB import PDBParser
+from Bio.Data.IUPACData import protein_letters_3to1
 from tools.P2Rank_filtering import filter_P2Rank
 from tools.P2Rank_to_PDB import P2Rank_to_PDB
 from tools.pocket_comparison import pocket_comparison
@@ -328,4 +330,36 @@ if st.session_state.pocket_unknown == True:
             st.write('no matching pockets found')
         else:
             st.dataframe(pd.read_csv(f'{output_path}pocket_comparison.csv').iloc[:, 1:])
-
+    
+    #########################################pocket residues######################################
+    st.write('You will need the pocket residues for docking.\
+             check them here for each of your pockets')
+    if st.selectbox('select your pocket detection method', 
+                    options = ['fpocket', 'P2Rank'], index = 0) == 'fpocket':
+        pockets_select = st.selectbox('select your fpocket', options = pocket_list, 
+                                      index = 0, placeholder = "select a pocket")
+        pockets_select_path = f'{path_pockets}/{pockets_select}_atm.pdb'
+    else:
+        pockets_select = st.selectbox('select your P2Rank pocket', options = pocket_list2, 
+                                      index = 0, placeholder = "select a pocket")
+        pockets_select_path = f'{path_pockets2}/{pockets_select}_atm.pdb'
+    if pockets_select is not "select a pocket":
+        parser = PDBParser(QUIET = True)
+        structure = parser.get_structure('pocket_structure', pockets_select_path)
+        residues = set()
+        for model in structure:
+            for chain in model:
+                for residue in chain:
+                    if residue.id[0] == ' ': #excludes heteroatoms etc.
+                        resname = residue.resname
+                        resnum = residue.id[1]
+                        chain_id = chain.id #eig nicht nötig
+                        
+                        try: #sicher gehen dass er nicht verkackt
+                            one_letter = protein_letters_3to1[resname.capitalize()]
+                            residues.add(f'{one_letter}{resnum}')
+                        except KeyError:
+                            pass
+        st.write(','.join(sorted(residues)))
+                            
+    #we want this formal A:145,A:230,S:450
