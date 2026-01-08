@@ -1,3 +1,4 @@
+# python3 /workspace/workflow/scripts/bioemu_pipeline.py --fasta /workspace/data/inputs/target.fasta --working_dir data/interim/bioemu_workdir --output_pdb data/inputs/bioemu_target.pdb --samples 10
 import sys
 import os
 import subprocess
@@ -7,6 +8,7 @@ import shutil
 import argparse
 from pdbfixer import PDBFixer
 from openmm.app import PDBFile
+import torch
 
 # --- CONFIGURATION ---
 AA1_TO_3 = {
@@ -18,7 +20,16 @@ AA1_TO_3 = {
 def run_bioemu(fasta_path, output_dir, num_samples=100):
     """Executes the BioEmu sampling command."""
     print(f"🚀 Starting BioEmu sampling for {fasta_path}...")
-    
+    # --- GPU DIAGNOSTIC CHECK ---
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0)
+        device_count = torch.cuda.device_count()
+        print(f"✅ GPU DETECTED: {device_name} (Total GPUs: {device_count})")
+        print("🚀 BioEmu will run in FAST mode.")
+    else:
+        print("⚠️  NO GPU DETECTED. BioEmu will run in SLOW mode (CPU).")
+        print("   If you expected a GPU, check your Docker run command (--gpus all).")
+
     cmd = [
         sys.executable, "-m", "bioemu.sample",
         "--sequence", fasta_path,

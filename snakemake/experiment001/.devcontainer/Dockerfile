@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     tmux \
     build-essential \
     openjdk-17-jre-headless \
+    patch \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
@@ -24,8 +25,10 @@ RUN wget https://github.com/rdk/p2rank/releases/download/2.5.1/p2rank_2.5.1.tar.
     rm -rf /tmp/p2rank.tar.gz
 
 
-# 3. Make conda non-interactive and up-to-date
+# 3. Make conda non-interactive and up-to-date + Libmamba for faster loading
 RUN conda update -n base -c defaults -y conda && \
+    conda install -n base -c conda-forge conda-libmamba-solver && \
+    conda config --set solver libmamba && \
     conda config --set always_yes yes --set changeps1 no
 
 # 4. Create the Conda environment
@@ -48,6 +51,7 @@ RUN conda create -n adtools -c conda-forge -c bioconda \
     biopython \
     openmm \
     pdbfixer \
+    cudatoolkit \ 
     pip
 
 # 5. Install pip packages
@@ -56,13 +60,16 @@ RUN /opt/conda/envs/adtools/bin/pip install \
     py3Dmol \
     ipython_genutils \
     stmol \
-    bioemu
+    bioemu \
+    torch
 
 # 6. Clean conda caches (IMPORTANT)
 RUN conda clean -afy
 
 # 7. Activate adtools by default
 ENV PATH="/opt/conda/envs/adtools/bin:$PATH"
+# Fix for VS Code Terminal
+RUN echo "source activate adtools" >> ~/.bashrc 
 
 # 8. Setup app
 WORKDIR /app

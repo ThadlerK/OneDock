@@ -20,7 +20,8 @@
   // -----------------------------
   "runArgs": [
     "--security-opt", "label=disable",
-    "--network", "host"
+    "--network", "host",
+    "--gpus", "all"
   ],
 
   // -----------------------------

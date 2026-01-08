@@ -40,5 +40,5 @@ if st.button("Run Ligand Preparation"):
 
 # --- NAVIGATION ---
 st.markdown("---")
-if st.button("Go to Docking step"):
-    st.switch_page("pages/3_Docking.py")
+if st.button("Go to Pocket Definition step"):
+    st.switch_page("pages/2_Pocket_Prediction.py")

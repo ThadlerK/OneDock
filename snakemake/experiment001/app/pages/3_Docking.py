@@ -3,7 +3,7 @@ import subprocess
 import yaml
 from utils import save_config
 
-st.title("4️. Run Docking")
+st.title("Run Docking")
 
 # --- ENGINE SELECTION ---
 engine = st.selectbox("Select Docking Engine", ["AutoDock Vina", "Schrödinger Glide"])
@@ -16,16 +16,6 @@ save_config({"docking_engine": engine})
 # --- EXECUTION ---
 st.markdown("---")
 st.subheader("Pipeline Execution")
-
-residue_input = st.text_input("Pocket Residues", placeholder="e.g., A:145,A:230")
-
-if st.button("Save Config"):
-    # Save directly to config.yaml
-    save_config({
-        "pocket_residues": residue_input,
-        "grid_size": 20,
-        "exhaustiveness": 8
-    })
 
 if st.button("🚀 Launch Docking Pipeline"):
     with st.spinner(f"Running {engine}..."):

@@ -14,8 +14,10 @@ rule prepare_structure:
         pdb = config.get("receptor_path", "data/inputs/target.pdb")
     output:
         output_pdbqt = "data/interim/receptor_ready.pdbqt"
+    params:
+        h_flag = "" if not config.get("structure_known", True) else "-h"
     shell:
-        "obabel -ipdb {input.pdb} -opdbqt -O {output.output_pdbqt} -xr -h --partialcharge gasteiger 2> /dev/null"
+        "obabel -ipdb {input.pdb} -opdbqt -O {output.output_pdbqt} -xr {params.h_flag} --partialcharge gasteiger 2> /dev/null"
 
 rule convert_ligand:
     input:

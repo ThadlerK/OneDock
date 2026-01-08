@@ -26,7 +26,7 @@ if "pocket_comparison_run" not in st.session_state:
     st.session_state.pocket_comparison_run = False
 
 
-st.title("Pocket Detection")
+st.title("Pocket Definition")
 # --- POCKET SELECTION ---
 st.subheader("Binding Pocket Configuration")
 pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], index=0)
@@ -34,18 +34,16 @@ pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], i
 
 if pocket_status == "Known":
     st.info("Pocket is known. Please define coordinates.")
-    c1, c2, c3 = st.columns(3)
-    cx = c1.number_input("Center X", value=0.0)
-    cy = c2.number_input("Center Y", value=0.0)
-    cz = c3.number_input("Center Z", value=0.0)
-    
-    # Save coordinates instantly
-    save_config({
-        "pocket_known": True,
-        "center_x": cx, 
-        "center_y": cy, 
-        "center_z": cz
-    })
+    residue_input = st.text_input("Pocket Residues", placeholder="e.g., A:145,A:230")
+
+    if st.button("Save Config"):
+        # Save directly to config.yaml
+        save_config({
+            "pocket_residues": residue_input,
+            "grid_size": 20,
+            "exhaustiveness": 8
+        })
+
     st.session_state.pocket_unknown = False
     if st.button("Confirm & Proceed to Docking ➡️"):
         st.switch_page("pages/3_Docking.py")
