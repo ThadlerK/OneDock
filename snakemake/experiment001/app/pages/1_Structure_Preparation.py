@@ -9,7 +9,7 @@ if st.button("Run Receptor Preparation"):
     with st.spinner("Running Python Preparation Script..."):
         target_output_file = "data/interim/receptor_ready.pdbqt"
         
-        cmd = ["snakemake", "--cores", "1", target_output_file]
+        cmd = ["snakemake", "--cores", "1", target_output_file, "--rerun-incomplete"]
         process = subprocess.run(cmd, capture_output=True, text=True)
         
         if process.returncode == 0:

@@ -48,6 +48,7 @@ RUN conda create -n adtools -c conda-forge -c bioconda \
     biobb_structure_utils \
     snakemake \
     streamlit \
+    streamlit-aggrid \
     biopython \
     openmm \
     pdbfixer \

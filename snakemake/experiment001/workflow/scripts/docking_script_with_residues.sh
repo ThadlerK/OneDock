@@ -110,9 +110,23 @@ if [ -f "$OUTPUT_LOG" ]; then
     # Get filenames for the report
     REC_NAME=$(basename "$RECEPTOR_PDBQT" .pdbqt)
     LIG_NAME=$(basename "$LIGAND_PDBQT" .pdbqt)
+
+    # Try to fetch SMILES from the file header (Fastest)
+    SMILES=$(grep "^REMARK SMILES " "$LIGAND_PDBQT" | grep -v " IDX " | awk '{print $3}' | head -n 1)
+
+    # Fallback: If header was missing (variable is empty), calculate it with OpenBabel
+    if [ -z "$SMILES" ]; then
+        echo "   Warning: No SMILES header found. Calculating from structure..."
+        SMILES=$(obabel -ipdbqt "$LIGAND_PDBQT" -osmi 2> /dev/null | awk '{print $1}')
+    fi
+
+    # Final Fallback: If even OpenBabel failed
+    if [ -z "$SMILES" ]; then
+        SMILES="unknown"
+    fi
     
-    echo "Receptor,Ligand,Affinity_kcal_mol" > "$OUTPUT_SUMMARY"
-    echo "$REC_NAME,$LIG_NAME,$AFFINITY" >> "$OUTPUT_SUMMARY"
+    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > "$OUTPUT_SUMMARY"
+    echo "$REC_NAME,$LIG_NAME,$AFFINITY,$SMILES" >> "$OUTPUT_SUMMARY"
     
     echo "Docking Complete. Best Affinity: $AFFINITY"
 else

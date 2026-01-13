@@ -65,7 +65,7 @@ rule aggregate_results:
         "data/results/docking_report.csv"
     shell:
         """
-        echo "Ligand_ID,Receptor,Affinity_kcal_mol" > {output}
+        echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > {output}
         if [ -n "{input}" ]; then
             tail -n +2 -q {input} >> {output}
         fi

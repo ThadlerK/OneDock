@@ -2,6 +2,8 @@ import streamlit as st
 import subprocess
 import yaml
 from utils import save_config
+import shutil
+import os
 
 st.title("Run Docking")
 
@@ -19,7 +21,16 @@ st.subheader("Pipeline Execution")
 
 if st.button("🚀 Launch Docking Pipeline"):
     with st.spinner(f"Running {engine}..."):
-        # 1. Construct Command
+        if os.path.exists("data/results/stats"):
+            shutil.rmtree("data/results/stats")
+        if os.path.exists("data/results/logs"):
+            shutil.rmtree("data/results/logs")
+        if os.path.exists("data/results/poses"):
+            shutil.rmtree("data/results/poses")
+        if os.path.exists("data/results/docking_report.csv"):
+            os.remove("data/results/docking_report.csv")
+        
+        # Construct Command
         # We point Snakemake to our config and the desired output file
         cmd = [
             "snakemake",

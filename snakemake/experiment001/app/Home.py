@@ -65,7 +65,8 @@ else:
                     "snakemake", 
                     target_output_pdb,
                     "--cores", "1", 
-                    "--configfile", "config/config.yaml"
+                    "--configfile", "config/config.yaml",
+                    "--rerun-incomplete"
                 ]
 
                 process = subprocess.run(cmd, capture_output=True, text=True)
