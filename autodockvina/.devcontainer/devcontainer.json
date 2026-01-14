@@ -1,31 +1,32 @@
 {
-  // Set the name of the devcontainer
   "name": "autodock-vina",
+  
+  // CRITICAL FIXES FOR CLUSTER / PERMISSIONS
+  "updateRemoteUserUID": false,
+  "remoteUser": "root",
+  "containerUser": "root",
+
   "build": {
-    // This assumes your Dockerfile is at:
-    // .../autodock_vina/.devcontainer/Dockerfile
     "dockerfile": "Dockerfile"
   },
-
-  // Specify run arguments
+  
   "runArgs": [
-    // "--gpus", "all",
+    // Essential for clusters without SELinux support on disks
+    "--security-opt", "label=disable",
+    // Good for clusters to access license servers, but be careful of port conflicts
     "--network", "host"
   ],
 
-  // Specify where workspace directory is mounted in the devcontainer
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+
+  "workspaceFolder": "/workspace",
+
   "mounts": [
-    // Mount your whole git repo (e.g., 'my_project') to '/workspace/my_project'
-    "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind,consistency=cached"
-    // Mount the shared folder
-    // "source=/shared,target=/shared,type=bind,consistency=cached"
+    // ONLY mount the extra shared folder here. 
+    // VS Code handles the main project mount automatically.
+    "source=/home/shared,target=/home/shared,type=bind,consistency=cached"
   ],
 
-  // Set the working directory inside the container
-  // This will open VS Code in this specific subfolder
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-
-  // Add vscode extensions
   "customizations": {
     "vscode": {
       "extensions": [
