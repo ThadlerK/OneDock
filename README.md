@@ -83,4 +83,26 @@ Bevor du weiterarbeitest (oder bevor du einen Pull Request machst), solltest du 
 ---
 
 ## 3. Arbeit abschließen (Merge in Main)
+Wenn dein Feature fertig ist und für alle im Team verfügbar sein soll.
+
+### Option A: Über GitHub (Empfohlen)
+1.  Gehe auf die GitHub-Seite des Repositories.
+2.  Erstelle einen **Pull Request** (`dein-branch` ➡️ `main`).
+3.  Klicke auf **Merge**.
+
+### Option B: Manuell über das Terminal
+*(Nur nutzen, wenn Option A nicht möglich ist)*
+
+```bash
+# 1. Zum Main wechseln
+git checkout main
+
+# 2. Main aktualisieren
+git pull origin main
+
+# 3. Deinen Branch hineinholen
+git merge dein-branch-name
+
+# 4. Ergebnis hochladen
+git push origin main
 
