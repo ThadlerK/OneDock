@@ -1,1 +1,9 @@
 **/data
+**/.snakemake
+**/__pycache__
+OneDock/log_1.out
+OneDock/log_2.out
+OneDock/log.err
+OneDock/log.out
+**/sandbox**
+OneDock/config/config.yaml
