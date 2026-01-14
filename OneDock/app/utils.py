@@ -1,9 +1,12 @@
 # app/utils.py
-import yaml
-import os
 import glob
-import zipfile
+import os
+import re
+import requests
 import shutil
+import time
+import yaml
+import zipfile
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -11,9 +14,8 @@ from pathlib import Path
 from Bio.PDB import PDBParser
 from biobb_vs.fpocket.fpocket_run import fpocket_run
 from biobb_vs.fpocket.fpocket_filter import fpocket_filter
-
-
-
+from bs4 import BeautifulSoup
+from typing import List, Dict, Optional
 
 CONFIG_PATH = "config/config.yaml"
 DATA_DIRS = [
@@ -301,6 +303,11 @@ def pocket_comparison(
     matches_df.to_csv(output_csv)
 
 #ADME tools
+"""
+SwissADME Client for automated ADME property prediction
+This module provides functions to interact with SwissADME web service
+"""
+
 class SwissADMEClient:
     """
     Client for interacting with SwissADME web service
