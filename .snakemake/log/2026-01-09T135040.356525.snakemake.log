@@ -1,0 +1,124 @@
+Config file config/config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Job stats:
+job                  count
+-----------------  -------
+aggregate_results        1
+run_docking              7
+total                    8
+
+Select jobs to execute...
+
+[Fri Jan  9 13:50:40 2026]
+rule run_docking:
+    input: data/interim/receptor_ready.pdbqt, data/interim/ligands/lig_00000.pdbqt
+    output: data/results/poses/lig_00000_docked.pdbqt, data/results/logs/lig_00000.log, data/results/stats/lig_00000.csv
+    jobid: 14
+    reason: Missing output files: data/results/stats/lig_00000.csv
+    wildcards: id=lig_00000
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:50:43 2026]
+Finished job 14.
+1 of 8 steps (12%) done
+Select jobs to execute...
+
+[Fri Jan  9 13:50:43 2026]
+rule run_docking:
+    input: data/interim/receptor_ready.pdbqt, data/interim/ligands/lig_00002.pdbqt
+    output: data/results/poses/lig_00002_docked.pdbqt, data/results/logs/lig_00002.log, data/results/stats/lig_00002.csv
+    jobid: 12
+    reason: Missing output files: data/results/stats/lig_00002.csv
+    wildcards: id=lig_00002
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:50:45 2026]
+Finished job 12.
+2 of 8 steps (25%) done
+Select jobs to execute...
+
+[Fri Jan  9 13:50:45 2026]
+rule run_docking:
+    input: data/interim/receptor_ready.pdbqt, data/interim/ligands/lig_00001.pdbqt
+    output: data/results/poses/lig_00001_docked.pdbqt, data/results/logs/lig_00001.log, data/results/stats/lig_00001.csv
+    jobid: 10
+    reason: Missing output files: data/results/stats/lig_00001.csv
+    wildcards: id=lig_00001
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:50:47 2026]
+Finished job 10.
+3 of 8 steps (38%) done
+Select jobs to execute...
+
+[Fri Jan  9 13:50:47 2026]
+rule run_docking:
+    input: data/interim/receptor_ready.pdbqt, data/interim/ligands/lig_00004.pdbqt
+    output: data/results/poses/lig_00004_docked.pdbqt, data/results/logs/lig_00004.log, data/results/stats/lig_00004.csv
+    jobid: 6
+    reason: Missing output files: data/results/stats/lig_00004.csv
+    wildcards: id=lig_00004
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:50:48 2026]
+Finished job 6.
+4 of 8 steps (50%) done
+Select jobs to execute...
+
+[Fri Jan  9 13:50:48 2026]
+rule run_docking:
+    input: data/interim/receptor_ready.pdbqt, data/interim/ligands/lig_00003.pdbqt
+    output: data/results/poses/lig_00003_docked.pdbqt, data/results/logs/lig_00003.log, data/results/stats/lig_00003.csv
+    jobid: 4
+    reason: Missing output files: data/results/stats/lig_00003.csv
+    wildcards: id=lig_00003
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:50:51 2026]
+Finished job 4.
+5 of 8 steps (62%) done
+Select jobs to execute...
+
+[Fri Jan  9 13:50:51 2026]
+rule run_docking:
+    input: data/interim/receptor_ready.pdbqt, data/interim/ligands/lig_00006.pdbqt
+    output: data/results/poses/lig_00006_docked.pdbqt, data/results/logs/lig_00006.log, data/results/stats/lig_00006.csv
+    jobid: 8
+    reason: Missing output files: data/results/stats/lig_00006.csv
+    wildcards: id=lig_00006
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:51:02 2026]
+Finished job 8.
+6 of 8 steps (75%) done
+Select jobs to execute...
+
+[Fri Jan  9 13:51:02 2026]
+rule run_docking:
+    input: data/interim/receptor_ready.pdbqt, data/interim/ligands/lig_00005.pdbqt
+    output: data/results/poses/lig_00005_docked.pdbqt, data/results/logs/lig_00005.log, data/results/stats/lig_00005.csv
+    jobid: 1
+    reason: Missing output files: data/results/stats/lig_00005.csv
+    wildcards: id=lig_00005
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:51:04 2026]
+Finished job 1.
+7 of 8 steps (88%) done
+Select jobs to execute...
+
+[Fri Jan  9 13:51:04 2026]
+rule aggregate_results:
+    input: data/results/stats/lig_00005.csv, data/results/stats/lig_00003.csv, data/results/stats/lig_00004.csv, data/results/stats/lig_00006.csv, data/results/stats/lig_00001.csv, data/results/stats/lig_00002.csv, data/results/stats/lig_00000.csv
+    output: data/results/docking_report.csv
+    jobid: 0
+    reason: Missing output files: data/results/docking_report.csv; Input files updated by another job: data/results/stats/lig_00006.csv, data/results/stats/lig_00003.csv, data/results/stats/lig_00005.csv, data/results/stats/lig_00002.csv, data/results/stats/lig_00000.csv, data/results/stats/lig_00001.csv, data/results/stats/lig_00004.csv
+    resources: tmpdir=/tmp
+
+[Fri Jan  9 13:51:04 2026]
+Finished job 0.
+8 of 8 steps (100%) done
+Complete log: .snakemake/log/2026-01-09T135040.356525.snakemake.log
