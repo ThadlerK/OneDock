@@ -145,7 +145,7 @@ def on_confirm_click():
 
 # The Logic
 if not st.session_state.confirm_reset:
-    st.sidebar.button("🗑️ Reset All Data", on_click=on_reset_click, type="primary")
+    st.sidebar.button("🗑️ Reset All Data", on_click=on_reset_click)
 else:
     st.sidebar.warning("Are you sure? This will delete all inputs and results.")
     col1, col2 = st.sidebar.columns(2)

@@ -1,0 +1,12 @@
+#this is the file that sets the layout for our app
+
+[theme]
+primaryColor = "61D992"
+backgroundCorlor = "FFFFFF"
+secondaryBackgroundColor = "F2EAFA"
+textColor = "000000"
+font = "sans serif"
+
+
+#either this: primaryColor = "B890E4" secondaryBackgroundColor = "CDF3DC" 
+#or this: primaryColor = "90E4B3" secondaryBackgroundColor = "F2EAFA" (purple background)
