@@ -25,7 +25,7 @@ if "pocket_comparison_run" not in st.session_state:
     st.session_state.pocket_comparison_run = False
 
 
-st.title("Pocket Definition")
+st.title("Pocket Detection")
 # --- POCKET SELECTION ---
 st.subheader("Binding Pocket Configuration")
 pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], index=0)
@@ -33,16 +33,18 @@ pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], i
 
 if pocket_status == "Known":
     st.info("Pocket is known. Please define coordinates.")
-    residue_input = st.text_input("Pocket Residues", placeholder="e.g., A:145,A:230")
-
-    if st.button("Save Config"):
-        # Save directly to config.yaml
-        save_config({
-            "pocket_residues": residue_input,
-            "grid_size": 20,
-            "exhaustiveness": 8
-        })
-
+    c1, c2, c3 = st.columns(3)
+    cx = c1.number_input("Center X", value=0.0)
+    cy = c2.number_input("Center Y", value=0.0)
+    cz = c3.number_input("Center Z", value=0.0)
+    
+    # Save coordinates instantly
+    save_config({
+        "pocket_known": True,
+        "center_x": cx, 
+        "center_y": cy, 
+        "center_z": cz
+    })
     st.session_state.pocket_unknown = False
     if st.button("Confirm & Proceed to Docking"):
         st.switch_page("pages/3_Docking.py")
@@ -185,59 +187,7 @@ if st.session_state.pocket_unknown == True:
 
         st.write('Here you can set the parameters for P2Rank.')
 
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        P2rank_probability = st.select_slider(label = 'minimum probability',
-                                            options = [i / 100 for i in range(0,101)],
-                                            value = 0.5)
-    with col2:
-        P2rank_rank = st.select_slider(label = 'maximum P2Rank rank',
-                                    options = list(range(1,51)),
-                                    value = 15)
-    with col3:
-        P2rank_score = st.select_slider(label = 'minimum P2Rank score',
-                                        options = list(range(0,101)),
-                                        value = 10)
-    with col4:
-        if P2rank_score < 40:
-            st.error('low confidence pockets might be included')
-        if P2rank_score >=40 and P2rank_score <60:
-            st.warning('moderate confidence pockets might be included')
-        if P2rank_score >=60:
-            st.success('only high confidence pockets are included')
-
-    #run P2Rank
-    if st.button("run P2Rank"):
-        path_output_P2Rank.mkdir(parents=True, exist_ok=True)
-        #save the pdb file
-        pdb_path = Path(path_output_P2Rank) / pdb_file.name
-        with open(pdb_path, "wb") as f:
-            f.write(pdb_file.getbuffer())
-
-        if  path_output_P2Rank != '':
-            subprocess.run(
-                ["/opt/p2rank_2.5.1/prank", "predict", "-f", pdb_path, "-o", str(path_output_P2Rank)],
-                check=True
-            )
-            filter_P2Rank(
-                P2Rank_csv_path = Path(path_output_P2Rank) / f"{pdb_file.name}_predictions.csv",
-                P2Rank_score = P2rank_score,
-                P2Rank_probability = P2rank_probability,
-                P2Rank_rank = P2rank_rank,
-                P2Rank_filtered = Path(path_output_P2Rank) / f"{pdb_file.name}_filtered.csv"
-            )
-
-            csv_path = Path(path_output_P2Rank) / f"{pdb_file.name}_filtered.csv"
-            P2Rank_to_PDB(
-                input_csv = csv_path,
-                input_pdb = pdb_path, 
-                output_pdb_dir = Path(path_output_P2Rank) / 'filtered_pockets'
-            )
-            st.session_state.P2Rank_run = True
-
-    if st.session_state.P2Rank_run == True:
-        #visualization
-        col1, col2 = st.columns(2)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             P2rank_probability = st.select_slider(label = 'minimum probability',
                                                 options = [i / 100 for i in range(0,101)],
@@ -359,34 +309,39 @@ if st.session_state.pocket_unknown == True:
                 st.dataframe(pd.read_csv(f'{output_path}pocket_comparison.csv').iloc[:, 1:])
 
     #########################################pocket residues######################################
-    st.write('You will need the pocket residues for docking.\
-             check them here for each of your pockets')
-    if st.selectbox('select your pocket detection method', 
-                    options = ['fpocket', 'P2Rank'], index = 0) == 'fpocket':
-        pockets_select = st.selectbox('select your fpocket', options = pocket_list, 
-                                      index = 0, placeholder = "select a pocket")
-        pockets_select_path = f'{path_pockets}/{pockets_select}_atm.pdb'
-    else:
-        pockets_select = st.selectbox('select your P2Rank pocket', options = pocket_list2, 
-                                      index = 0, placeholder = "select a pocket")
-        pockets_select_path = f'{path_pockets2}/{pockets_select}_atm.pdb'
-    if pockets_select is not "select a pocket":
-        parser = PDBParser(QUIET = True)
-        structure = parser.get_structure('pocket_structure', pockets_select_path)
-        residues = set()
-        for model in structure:
-            for chain in model:
-                for residue in chain:
-                    if residue.id[0] == ' ': #excludes heteroatoms etc.
-                        resname = residue.resname
-                        resnum = residue.id[1]
-                        chain_id = chain.id #eig nicht nötig
-                        
-                        try: #sicher gehen dass er nicht verkackt
-                            one_letter = protein_letters_3to1[resname.capitalize()]
-                            residues.add(f'{chain.id}{resnum}')
-                        except KeyError:
-                            pass
-        st.write(','.join(sorted(residues)))
-                            
-    #we want this formal A:145,A:230,S:450
+    
+    with st.container():
+        if st.session_state.fpocket_run == True or st.session_state.P2Rank_run == True:
+            st.divider() #layout
+            st.write('You will need the pocket residues for docking.\
+                    check them here for each of your pockets')
+            if st.selectbox('select your pocket detection method', 
+                            options = ['fpocket', 'P2Rank'], index = 0) == 'fpocket':
+                pockets_select = st.selectbox('select your fpocket', options = pocket_list, 
+                                            index = 0, placeholder = "select a pocket")
+                pockets_select_path = f'{path_pockets}/{pockets_select}_atm.pdb'
+            else:
+                pockets_select = st.selectbox('select your P2Rank pocket', options = pocket_list2, 
+                                            index = 0, placeholder = "select a pocket")
+                pockets_select_path = f'{path_pockets2}/{pockets_select}_atm.pdb'
+            if pockets_select is not "select a pocket":
+                parser = PDBParser(QUIET = True)
+                structure = parser.get_structure('pocket_structure', pockets_select_path)
+                residues = set()
+                for model in structure:
+                    for chain in model:
+                        for residue in chain:
+                            if residue.id[0] == ' ': #excludes heteroatoms etc.
+                                resname = residue.resname
+                                resnum = residue.id[1]
+                                chain_id = chain.id #eig nicht nötig
+                                
+                                try: #sicher gehen dass er nicht verkackt
+                                    one_letter = protein_letters_3to1[resname.capitalize()]
+                                    residues.add(f'{one_letter}{resnum}')
+                                except KeyError:
+                                    pass
+                st.write(','.join(sorted(residues)))
+                if st.button("save the residues for docking"):
+                    save_config({"pocket-residues": ','.join(sorted(residues))})
+                                
