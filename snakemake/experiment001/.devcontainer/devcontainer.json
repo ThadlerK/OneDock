@@ -1,0 +1,61 @@
+{
+  "name": "streamlit-snakemake",
+
+  // -----------------------------
+  // Cluster / permissions fixes
+  // -----------------------------
+  "updateRemoteUserUID": false,
+  "remoteUser": "root",
+  "containerUser": "root",
+
+  // -----------------------------
+  // Use prebuilt Docker image
+  // -----------------------------
+"build": {
+  "dockerfile": "Dockerfile"
+},
+
+  // -----------------------------
+  // Optional run args for clusters
+  // -----------------------------
+  "runArgs": [
+    "--security-opt", "label=disable",
+    "--network", "host",
+    "--gpus", "all"
+  ],
+
+  // -----------------------------
+  // Workspace mounting
+  // -----------------------------
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+
+  "mounts": [
+    "source=/home/shared,target=/home/shared,type=bind,consistency=cached"
+  ],
+
+  // -----------------------------
+  // Port forwarding
+  // -----------------------------
+  "forwardPorts": [8501],
+
+  // -----------------------------
+  // VS Code extensions
+  // -----------------------------
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "ms-python.black-formatter",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+
+  // -----------------------------
+  // Optional: Dev container defaults
+  // -----------------------------
+
+}

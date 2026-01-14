@@ -3,7 +3,6 @@
 **/.snakemake/
 **/__pycache__
 **/output_fpocket
-**/autodockvina
 snakemake/experiment001/log_1.out
 snakemake/experiment001/log_2.out
 snakemake/experiment001/log_3.out

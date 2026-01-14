@@ -1,0 +1,92 @@
+# Snakefile
+
+configfile: "config/config.yaml"
+
+LIGAND_IDS, = glob_wildcards("data/inputs/library_split/{id}.smi")
+
+rule all:
+    input:
+        "data/results/docking_report.csv"
+
+# Structure Preparation ---
+rule prepare_structure:
+    input:
+        pdb = config.get("receptor_path", "data/inputs/target.pdb")
+    output:
+        output_pdbqt = "data/interim/receptor_ready.pdbqt"
+    params:
+        h_flag = "" if not config.get("structure_known", True) else "-h"
+    shell:
+        "obabel -ipdb {input.pdb} -opdbqt -O {output.output_pdbqt} -xr {params.h_flag} --partialcharge gasteiger 2> /dev/null"
+
+rule convert_ligand:
+    input:
+        smi = "data/inputs/library_split/{id}.smi"
+    output:
+        pdbqt = "data/interim/ligands/{id}.pdbqt"
+    script:
+        "scripts/convert_smi_to_pdbqt.py"
+
+rule prepare_all_ligands:
+    input:
+        expand("data/interim/ligands/{id}.pdbqt", id=LIGAND_IDS)
+
+# Docking
+rule run_docking:
+    input:
+        receptor = "data/interim/receptor_ready.pdbqt",
+        ligand   = "data/interim/ligands/{id}.pdbqt"
+    output:
+        docked  = "data/results/poses/{id}_docked.pdbqt",
+        log     = "data/results/logs/{id}.log",
+        summary = "data/results/stats/{id}.csv"
+    params:
+        residues = config.get("pocket_residues", ""),
+        exhaustiveness = config.get("exhaustiveness", 8),
+        grid_size = config.get("grid_size", 20)
+    shell:
+        """
+        bash workflow/scripts/docking_script_with_residues.sh \
+            "{input.receptor}" \
+            "{input.ligand}" \
+            "{params.residues}" \
+            "{output.docked}" \
+            "{output.log}" \
+            "{output.summary}" \
+            "{params.grid_size}" \
+            "{params.exhaustiveness}"
+        """
+
+# --- AGGREGATION ---
+rule aggregate_results:
+    input:
+        expand("data/results/stats/{id}.csv", id=LIGAND_IDS)
+    output:
+        "data/results/docking_report.csv"
+    shell:
+        """
+        echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > {output}
+        if [ -n "{input}" ]; then
+            tail -n +2 -q {input} >> {output}
+        fi
+        """
+
+# --- BIOEMU STEP ---
+PYTHON_EXEC = "/opt/conda/envs/adtools/bin/python"
+
+rule run_bioemu_generation:
+    input:
+        fasta = "data/inputs/target.fasta"
+    output:
+        selected_pdb = "data/inputs/bioemu_target.pdb",
+        interim_dir = directory("data/interim/bioemu_workdir")
+    params:
+        samples = config.get("bioemu_samples", 10)
+    shell:
+        """
+        {PYTHON_EXEC} workflow/scripts/bioemu_pipeline.py \
+            --fasta {input.fasta} \
+            --working_dir {output.interim_dir} \
+            --output_pdb {output.selected_pdb} \
+            --samples {params.samples}
+        """
