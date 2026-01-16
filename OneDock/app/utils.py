@@ -597,6 +597,460 @@ def analyze_adme_profile(df: pd.DataFrame, ligand_id: str) -> Dict:
     return profile
 
 
+# PoseBusters validation functions
+def convert_pdbqt_to_pdb(pdbqt_file: str, pdb_file: str):
+    """
+    Convert PDBQT file to PDB format by removing AutoDock-specific columns
+    and reconstructing CONECT records to preserve molecular connectivity.
+    
+    Arguments:
+        pdbqt_file: path to input PDBQT file
+        pdb_file: path to output PDB file
+    """
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+        
+        # First, try using RDKit for better bond preservation
+        try:
+            # Read molecule from PDBQT (as MOL format - RDKit can handle it)
+            mol = Chem.MolFromPDBFile(pdbqt_file, removeHs=False, sanitize=False)
+            
+            if mol is not None:
+                # Try to sanitize and assign stereochemistry
+                try:
+                    Chem.SanitizeMol(mol)
+                    AllChem.AssignStereochemistryFrom3D(mol)
+                except:
+                    pass  # Continue even if sanitization fails
+                
+                # Write to PDB with proper connectivity
+                Chem.MolToPDBFile(mol, pdb_file)
+                return True
+        except:
+            pass  # Fall back to manual conversion
+        
+        # Fallback: Manual conversion with improved CONECT handling
+        with open(pdbqt_file, 'r') as f_in:
+            lines = f_in.readlines()
+        
+        atom_lines = []
+        conect_lines = []
+        atom_serial_map = {}  # Map old serial to new serial
+        new_serial = 1
+        
+        with open(pdb_file, 'w') as f_out:
+            # First pass: write atoms and build serial number map
+            for line in lines:
+                # Skip AutoDock-specific lines
+                if line.startswith('REMARK') or line.startswith('ROOT') or line.startswith('ENDROOT'):
+                    continue
+                if line.startswith('TORSDOF') or line.startswith('BRANCH') or line.startswith('ENDBRANCH'):
+                    continue
+                
+                # Handle ATOM and HETATM lines
+                if line.startswith('ATOM') or line.startswith('HETATM'):
+                    # Extract original serial number
+                    try:
+                        old_serial = int(line[6:11].strip())
+                        atom_serial_map[old_serial] = new_serial
+                    except:
+                        pass
+                    
+                    # PDBQT has extra columns at positions 70-79, keep only up to column 66
+                    pdb_line = line[:66] + '\n'
+                    atom_lines.append(pdb_line)
+                    f_out.write(pdb_line)
+                    new_serial += 1
+                    
+                elif line.startswith('MODEL') or line.startswith('ENDMDL') or line.startswith('TER'):
+                    f_out.write(line)
+                    
+                elif line.startswith('CONECT'):
+                    conect_lines.append(line)
+            
+            # Second pass: write CONECT records with updated serial numbers
+            for line in conect_lines:
+                parts = line.split()
+                if len(parts) > 1:
+                    try:
+                        # Update serial numbers in CONECT record
+                        atom_serial = int(parts[1])
+                        if atom_serial in atom_serial_map:
+                            new_line = f"CONECT{atom_serial_map[atom_serial]:5d}"
+                            for i in range(2, len(parts)):
+                                bonded_serial = int(parts[i])
+                                if bonded_serial in atom_serial_map:
+                                    new_line += f"{atom_serial_map[bonded_serial]:5d}"
+                            f_out.write(new_line + '\n')
+                    except:
+                        # If parsing fails, write original line
+                        f_out.write(line)
+            
+            # If no CONECT records exist, try to generate them based on distances
+            if not conect_lines and len(atom_lines) > 0:
+                f_out.write("REMARK Generated CONECT records based on atomic distances\n")
+                
+                # Parse atom coordinates
+                atoms = []
+                for atom_line in atom_lines:
+                    try:
+                        serial = int(atom_line[6:11].strip())
+                        x = float(atom_line[30:38].strip())
+                        y = float(atom_line[38:46].strip())
+                        z = float(atom_line[46:54].strip())
+                        element = atom_line[76:78].strip() if len(atom_line) > 76 else atom_line[12:14].strip()[0]
+                        atoms.append({'serial': serial, 'x': x, 'y': y, 'z': z, 'element': element})
+                    except:
+                        continue
+                
+                # Generate CONECT records based on typical bond lengths
+                bond_tolerances = {
+                    'C': 1.7, 'N': 1.7, 'O': 1.6, 'S': 2.1,
+                    'P': 2.2, 'H': 1.3, 'F': 1.5, 'Cl': 2.0,
+                    'Br': 2.2, 'I': 2.4
+                }
+                
+                for i, atom1 in enumerate(atoms):
+                    bonds = []
+                    for j, atom2 in enumerate(atoms):
+                        if i >= j:
+                            continue
+                        
+                        # Calculate distance
+                        dx = atom1['x'] - atom2['x']
+                        dy = atom1['y'] - atom2['y']
+                        dz = atom1['z'] - atom2['z']
+                        dist = (dx*dx + dy*dy + dz*dz) ** 0.5
+                        
+                        # Determine bond cutoff
+                        cutoff1 = bond_tolerances.get(atom1['element'], 1.7)
+                        cutoff2 = bond_tolerances.get(atom2['element'], 1.7)
+                        max_bond_length = cutoff1 + cutoff2
+                        
+                        if dist < max_bond_length:
+                            bonds.append(atom2['serial'])
+                    
+                    if bonds:
+                        conect_line = f"CONECT{atom1['serial']:5d}"
+                        for bonded in bonds[:4]:  # Limit to 4 bonds per line
+                            conect_line += f"{bonded:5d}"
+                        f_out.write(conect_line + '\n')
+        
+        return True
+    except Exception as e:
+        print(f"Error converting {pdbqt_file} to PDB: {e}")
+        return False
+
+
+def run_posebusters_validation(
+    receptor_pdb: str,
+    ligand_pdb_files: List[tuple],
+    output_dir: str
+) -> pd.DataFrame:
+    """
+    Run PoseBusters validation on docked poses.
+    
+    Arguments:
+        receptor_pdb: path to receptor PDB file
+        ligand_pdb_files: list of tuples (ligand_id, ligand_pdb_path)
+        output_dir: directory to store validation results
+        
+    Returns:
+        DataFrame with validation results
+    """
+    try:
+        # Import PoseBusters
+        from posebusters import PoseBusters
+        import pandas as pd
+        
+        # Initialize PoseBusters
+        buster = PoseBusters(config='dock')
+        
+        results = []
+        
+        for ligand_id, ligand_pdb in ligand_pdb_files:
+            try:
+                # Create a temporary dataframe for PoseBusters input
+                mol_table = pd.DataFrame({
+                    'mol_pred': [ligand_pdb],
+                    'mol_true': [ligand_pdb],  # For docking, use same file
+                    'mol_cond': [receptor_pdb]
+                })
+                
+                # Run validation
+                result = buster.bust_table(mol_table, None)
+                
+                # Extract results
+                if result is not None and len(result) > 0:
+                    # Calculate quality score as percentage of passed tests
+                    test_columns = [col for col in result.columns if col not in ['file', 'mol_pred', 'mol_true', 'mol_cond']]
+                    
+                    passed_tests = 0
+                    total_tests = 0
+                    failed_tests = []
+                    
+                    # Store individual test results
+                    row_data = {'ligand_id': ligand_id}
+                    
+                    for col in test_columns:
+                        if pd.api.types.is_bool_dtype(result[col]):
+                            total_tests += 1
+                            test_passed = result[col].values[0]
+                            
+                            # Add individual test result to row
+                            row_data[col] = 'Pass' if test_passed else 'Fail'
+                            
+                            if test_passed:
+                                passed_tests += 1
+                            else:
+                                failed_tests.append(col)
+                    
+                    quality_score = passed_tests / total_tests if total_tests > 0 else 0.0
+                    
+                    row_data['quality_score'] = quality_score
+                    row_data['passed_tests'] = passed_tests
+                    row_data['total_tests'] = total_tests
+                    row_data['failed_tests_summary'] = ', '.join(failed_tests) if failed_tests else 'None'
+                    
+                    results.append(row_data)
+                else:
+                    # If validation failed, add default values
+                    results.append({
+                        'ligand_id': ligand_id,
+                        'quality_score': 0.0,
+                        'passed_tests': 0,
+                        'total_tests': 0,
+                        'failed_tests_summary': 'Validation failed'
+                    })
+                    
+            except Exception as e:
+                print(f"Error validating {ligand_id}: {e}")
+                import traceback
+                traceback.print_exc()
+                results.append({
+                    'ligand_id': ligand_id,
+                    'quality_score': 0.0,
+                    'passed_tests': 0,
+                    'total_tests': 0,
+                    'failed_tests_summary': f'Error: {str(e)}'
+                })
+        
+        # Create DataFrame
+        results_df = pd.DataFrame(results)
+        
+        # Save results
+        output_file = os.path.join(output_dir, 'posebusters_validation.csv')
+        results_df.to_csv(output_file, index=False)
+        
+        return results_df
+        
+    except ImportError:
+        print("PoseBusters not installed. Please install with: pip install posebusters")
+        return None
+    except Exception as e:
+        print(f"Error running PoseBusters validation: {e}")
+        return None
+
+
+# py3Dmol visualization functions
+def create_py3dmol_visualization(
+    receptor_pdb: str,
+    ligand_pdb: str,
+    pocket_residues: list = None,
+    original_receptor_pdb: str = None,
+    protein_style: str = 'cartoon',
+    ligand_style: str = 'stick',
+    show_surface: bool = False,
+    width: int = 800,
+    height: int = 600
+) -> str:
+    """
+    Create an interactive 3D visualization using py3Dmol with original receptor only.
+    
+    Arguments:
+        receptor_pdb: path to receptor PDB file (may contain multiple chains)
+        ligand_pdb: path to ligand PDB file
+        pocket_residues: list of pocket residue numbers
+        original_receptor_pdb: path to original uploaded receptor (single chain)
+        protein_style: visualization style for protein (cartoon, line, stick, sphere, cross)
+        ligand_style: visualization style for ligand (stick, sphere, line, cross)
+        show_surface: whether to show surface representation
+        width: viewer width in pixels
+        height: viewer height in pixels
+        
+    Returns:
+        HTML string containing the py3Dmol viewer
+    """
+    try:
+        # Read original receptor if provided, otherwise use receptor_pdb
+        receptor_to_use = original_receptor_pdb if original_receptor_pdb and os.path.exists(original_receptor_pdb) else receptor_pdb
+        
+        with open(receptor_to_use, 'r') as f:
+            receptor_data = f.read()
+        
+        with open(ligand_pdb, 'r') as f:
+            ligand_data = f.read()
+        
+        # Format pocket residues for selection
+        pocket_selection = ""
+        if pocket_residues:
+            residue_list = ','.join([str(r) for r in pocket_residues])
+            pocket_selection = f"resi: [{residue_list}]"
+        
+        # Create HTML with py3Dmol viewer
+        html_template = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://3Dmol.csb.pitt.edu/build/3Dmol-min.js"></script>
+            <style>
+                #viewer {{
+                    width: {width}px;
+                    height: {height}px;
+                    position: relative;
+                    margin: 0 auto;
+                }}
+            </style>
+        </head>
+        <body>
+            <div id="viewer"></div>
+            <script>
+                let viewer = $3Dmol.createViewer("viewer", {{
+                    backgroundColor: 'white'
+                }});
+                
+                // Add protein
+                let proteinData = `{receptor_data}`;
+                viewer.addModel(proteinData, "pdb");
+                
+                // Style protein
+                viewer.setStyle({{model: 0}}, {{
+                    {protein_style}: {{
+                        color: 'lightgray'
+                    }}
+                }});
+                
+                // Add pocket residues as sticks (addStyle = zusätzlich zum Protein-Style)
+                {"viewer.addStyle({model: 0, " + pocket_selection + "}, {stick: {colorscheme: 'default', radius: 0.25}});" if pocket_residues else ""}
+                
+                // Add ligand
+                let ligandData = `{ligand_data}`;
+                viewer.addModel(ligandData, "pdb");
+                
+                // Style ligand with thicker sticks in pink color
+                viewer.setStyle({{model: 1}}, {{
+                    {ligand_style}: {{
+                        color: 'hotpink',
+                        radius: 0.4
+                    }}
+                }});
+                
+                // Override O atoms to red and N atoms to blue in ligand
+                viewer.setStyle({{model: 1, elem: 'O'}}, {{
+                    {ligand_style}: {{
+                        color: 'red',
+                        radius: 0.4
+                    }}
+                }});
+                viewer.setStyle({{model: 1, elem: 'N'}}, {{
+                    {ligand_style}: {{
+                        color: 'blue',
+                        radius: 0.4
+                    }}
+                }});
+                
+                // Add surface if requested
+                {"viewer.addSurface($3Dmol.SurfaceType.VDW, {opacity: 0.5, color: 'lightgray'}, {model: 0});" if show_surface else ""}
+                
+                // Center and zoom to ligand
+                viewer.zoomTo({{model: 1}});
+                viewer.render();
+                viewer.zoom(0.8);
+            </script>
+        </body>
+        </html>
+        """
+        
+        return html_template
+        
+    except Exception as e:
+        print(f"Error creating py3Dmol visualization: {e}")
+        return None
+
+
+def analyze_protein_ligand_interactions(
+    receptor_pdb: str,
+    ligand_pdb: str,
+    distance_cutoff: float = 3.5
+) -> List[Dict]:
+    """
+    Analyze protein-ligand interactions.
+    
+    Arguments:
+        receptor_pdb: path to receptor PDB file
+        ligand_pdb: path to ligand PDB file
+        distance_cutoff: maximum distance for interactions (Angstroms)
+        
+    Returns:
+        List of dictionaries containing interaction information
+    """
+    try:
+        from Bio.PDB import PDBParser
+        import numpy as np
+        
+        parser = PDBParser(QUIET=True)
+        
+        # Load structures
+        receptor_structure = parser.get_structure('receptor', receptor_pdb)
+        ligand_structure = parser.get_structure('ligand', ligand_pdb)
+        
+        interactions = []
+        
+        # Get all atoms
+        receptor_atoms = [atom for atom in receptor_structure.get_atoms()]
+        ligand_atoms = [atom for atom in ligand_structure.get_atoms()]
+        
+        # Find interactions
+        for lig_atom in ligand_atoms:
+            lig_coord = lig_atom.get_coord()
+            
+            for rec_atom in receptor_atoms:
+                rec_coord = rec_atom.get_coord()
+                
+                # Calculate distance
+                distance = np.linalg.norm(lig_coord - rec_coord)
+                
+                if distance <= distance_cutoff:
+                    # Get residue information
+                    residue = rec_atom.get_parent()
+                    
+                    # Determine interaction type based on atom types
+                    interaction_type = 'van_der_waals'
+                    
+                    # Hydrogen bond detection (simplified)
+                    if (lig_atom.element in ['N', 'O'] and rec_atom.element in ['N', 'O']) and distance <= 3.5:
+                        interaction_type = 'hydrogen_bond'
+                    # Hydrophobic interaction
+                    elif lig_atom.element == 'C' and rec_atom.element == 'C' and distance <= 4.0:
+                        interaction_type = 'hydrophobic'
+                    
+                    interactions.append({
+                        'type': interaction_type,
+                        'ligand_atom': lig_atom.get_name(),
+                        'receptor_residue': residue.get_resname(),
+                        'receptor_residue_id': residue.get_id()[1],
+                        'receptor_atom': rec_atom.get_name(),
+                        'distance': round(distance, 2)
+                    })
+        
+        return interactions
+        
+    except Exception as e:
+        print(f"Error analyzing interactions: {e}")
+        return []
+
+
 if __name__ == "__main__":
     # Example usage
     print("SwissADME Client Module")
