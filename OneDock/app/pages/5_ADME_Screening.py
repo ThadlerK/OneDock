@@ -24,6 +24,12 @@ if not os.path.exists(result_file):
 df = pd.read_csv(result_file)
 df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
+# Rename columns for clarity
+if 'Ligand' in df_sorted.columns:
+    df_sorted['Ligand_ID'] = df_sorted['Ligand']
+if 'Smiles' in df_sorted.columns:
+    df_sorted['SMILES'] = df_sorted['Smiles']
+
 st.subheader("Select Ligands for ADME Screening")
 st.info("Select the top candidates based on docking affinity scores for ADME property prediction.")
 
@@ -35,39 +41,18 @@ selection_mode = st.radio(
 
 selected_ligands = []
 
-# Helper function to get SMILES for ligands
-def get_smiles_for_ligands(ligand_ids):
-    """Extract SMILES for given ligand IDs"""
-    smiles_dict = {}
-    for ligand_id in ligand_ids:
-        original_id = ligand_id.replace(".pdbqt", "")
-        smi_file = f"data/inputs/library_split/{original_id}.smi"
-        if os.path.exists(smi_file):
-            with open(smi_file, 'r') as f:
-                smiles = f.read().strip().split()[0]
-                smiles_dict[ligand_id] = smiles
-    return smiles_dict
-
 if selection_mode == "Top N ligands":
     n_top = st.slider("Select top N ligands", min_value=1, max_value=min(50, len(df_sorted)), value=10)
-    selected_ligands = df_sorted.head(n_top)['Receptor'].tolist()
-    # Get SMILES and display with corrected column names
-    smiles_dict = get_smiles_for_ligands(selected_ligands)
-    display_df = df_sorted.head(n_top)[['Receptor', 'Affinity_kcal_mol']].copy()
-    display_df['SMILES'] = display_df['Receptor'].map(smiles_dict)
-    display_df.columns = ['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']
-    st.dataframe(display_df, height=250)
+    selected_df = df_sorted.head(n_top)[['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
+    selected_ligands = df_sorted.head(n_top)['Ligand_ID'].tolist()
+    st.dataframe(selected_df, height=250)
 
 elif selection_mode == "Manual selection":
-    ligand_options = df_sorted['Receptor'].tolist()
+    ligand_options = df_sorted['Ligand_ID'].tolist()
     selected_ligands = st.multiselect("Select ligands:", ligand_options, default=ligand_options[:5])
     if selected_ligands:
-        # Get SMILES and display with corrected column names
-        smiles_dict = get_smiles_for_ligands(selected_ligands)
-        display_df = df_sorted[df_sorted['Receptor'].isin(selected_ligands)][['Receptor', 'Affinity_kcal_mol']].copy()
-        display_df['SMILES'] = display_df['Receptor'].map(smiles_dict)
-        display_df.columns = ['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']
-        st.dataframe(display_df, height=250)
+        selected_df = df_sorted[df_sorted['Ligand_ID'].isin(selected_ligands)][['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
+        st.dataframe(selected_df, height=250)
 
 elif selection_mode == "Custom affinity cutoff":
     affinity_cutoff = st.number_input(
@@ -75,13 +60,9 @@ elif selection_mode == "Custom affinity cutoff":
         value=-7.0,
         step=0.5
     )
-    selected_ligands = df_sorted[df_sorted['Affinity_kcal_mol'] <= affinity_cutoff]['Receptor'].tolist()
-    # Get SMILES and display with corrected column names
-    smiles_dict = get_smiles_for_ligands(selected_ligands)
-    display_df = df_sorted[df_sorted['Affinity_kcal_mol'] <= affinity_cutoff][['Receptor', 'Affinity_kcal_mol']].copy()
-    display_df['SMILES'] = display_df['Receptor'].map(smiles_dict)
-    display_df.columns = ['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']
-    st.dataframe(display_df, height=250)
+    selected_df = df_sorted[df_sorted['Affinity_kcal_mol'] <= affinity_cutoff][['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
+    selected_ligands = selected_df['Ligand_ID'].tolist()
+    st.dataframe(selected_df, height=250)
     st.info(f"Found {len(selected_ligands)} ligands with affinity ≤ {affinity_cutoff} kcal/mol")
 
 # --- SWISSADME SUBMISSION ---
@@ -89,20 +70,18 @@ st.markdown("---")
 st.subheader("Submit to SwissADME")
 
 if selected_ligands:
-    # Extract SMILES for submission
+    # Extract SMILES for submission (already in dataframe)
     smiles_data = []
     
     for ligand_id in selected_ligands:
-        original_id = ligand_id.replace(".pdbqt", "")
-        smi_file = f"data/inputs/library_split/{original_id}.smi"
-        
-        if os.path.exists(smi_file):
-            with open(smi_file, 'r') as f:
-                smiles = f.read().strip().split()[0]
-                smiles_data.append({
-                    'Ligand_ID': original_id,
-                    'SMILES': smiles
-                })
+        # Get SMILES from dataframe
+        ligand_row = df_sorted[df_sorted['Ligand_ID'] == ligand_id]
+        if not ligand_row.empty:
+            smiles = ligand_row['SMILES'].values[0]
+            smiles_data.append({
+                'Ligand_ID': ligand_id,
+                'SMILES': smiles
+            })
     
     if smiles_data:
         smiles_df = pd.DataFrame(smiles_data)
@@ -159,7 +138,7 @@ if selected_ligands:
                 # Merge with docking results
                 merged_df = df_sorted.merge(
                     adme_df,
-                    left_on='Receptor',
+                    left_on='Ligand_ID',
                     right_on=merge_key,
                     how='inner'
                 )
@@ -169,7 +148,8 @@ if selected_ligands:
                     
                     # Mapping: Anzeige-Name -> tatsächlicher Spaltenname in SwissADME / Docking
                     column_mapping = {
-                        'Ligand': 'Receptor',                 # aus Docking
+                        'Ligand_ID': 'Ligand_ID',             # aus Docking
+                        'SMILES': 'SMILES',                   # SMILES der Liganden
                         'Affinity_kcal_mol': 'Affinity_kcal_mol',
                         'Formula': 'Formula',
                         'Molecular Weight': 'MW',              # SwissADME: MW
@@ -292,7 +272,8 @@ if selected_ligands:
 
                         # sinnvolle Standardspalten fr die Ansicht
                         cols_to_show = [
-                            'Receptor',
+                            'Ligand_ID',
+                            'SMILES',
                             'Affinity_kcal_mol',
                             'MW',
                             '#H-bond donors',
@@ -316,21 +297,21 @@ if selected_ligands:
                     st.markdown("**Molecular Structures:**")
                     compound_to_view = st.selectbox(
                         "Select compound:",
-                        options=filtered_df['Receptor'].tolist() if 'Receptor' in filtered_df.columns else [],
+                        options=filtered_df['Ligand_ID'].tolist() if 'Ligand_ID' in filtered_df.columns else [],
                         key="structure_viewer"
                     )
                     
-                    if compound_to_view and 'SMILES' in smiles_df.columns:
+                    if compound_to_view:
                         # Get SMILES for selected compound
-                        compound_smiles = smiles_df[smiles_df['Ligand_ID'] == compound_to_view]['SMILES']
+                        compound_row = filtered_df[filtered_df['Ligand_ID'] == compound_to_view]
                         
-                        if not compound_smiles.empty:
+                        if not compound_row.empty and 'SMILES' in compound_row.columns:
                             try:
                                 from rdkit import Chem
                                 from rdkit.Chem import Draw
                                 from io import BytesIO
                                 
-                                smiles_str = compound_smiles.values[0]
+                                smiles_str = compound_row['SMILES'].values[0]
                                 mol = Chem.MolFromSmiles(smiles_str)
                                 
                                 if mol:
@@ -344,7 +325,7 @@ if selected_ligands:
                                     
                                     with col2:
                                         # Show compound properties
-                                        compound_data = merged_df[merged_df['Receptor'] == compound_to_view].iloc[0]
+                                        compound_data = merged_df[merged_df['Ligand_ID'] == compound_to_view].iloc[0]
                                         st.markdown(f"**Compound:** {compound_to_view}")
                                         st.markdown(f"**SMILES:** `{smiles_str}`")
                                         st.markdown(f"**Binding Affinity:** {compound_data['Affinity_kcal_mol']:.2f} kcal/mol")
@@ -373,7 +354,7 @@ if selected_ligands:
                             x='Molecular Weight',
                             y='TPSA',
                             color='Affinity_kcal_mol',
-                            hover_data=['Receptor'],
+                            hover_data=['Ligand_ID'],
                             title='Molecular Weight vs TPSA (colored by binding affinity)',
                             labels={'TPSA': 'Topological Polar Surface Area (Ų)'}
                         )
@@ -381,7 +362,7 @@ if selected_ligands:
                     
                 else:
                     st.warning("⚠️ Could not merge results. Check that ligand names match between files.")
-                    st.write("Docking ligand names:", df_sorted['Receptor'].head().tolist())
+                    st.write("Docking ligand names:", df_sorted['Ligand_ID'].head().tolist())
                     st.write("ADME column names:", adme_df.columns.tolist())
                 
             except Exception as e:
