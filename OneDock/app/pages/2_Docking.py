@@ -30,29 +30,29 @@ if st.button("Launch Docking Pipeline"):
         if not pocket_residues or not str(pocket_residues).strip():
             st.error("**Stop:** No binding pocket defined!")
             st.info("Please go to the **Structure** page and select residues (or enter them manually) before docking.")
-            st.stop()  
-            
+            st.stop()
+
+        ref_path = config.get("ref_path")
+        if ref_path:
+            if not pocket_residues or not str(pocket_residues).strip():
+                st.error("**Stop:** No binding pocket for reference receptor defined!")
+                st.info("Please go to the Pocket Prediction page and select residues (or enter them manually) before docking.")
+                st.stop()
+        
     except FileNotFoundError:
         st.error("Config file not found. Please save settings first.")
         st.stop()
 
-    # 2. Spinner & Cleanup (Passiert nur, wenn oben nicht gestoppt wurde)
+    # 2. Spinner & Cleanup
     with st.spinner(f"Running docking pipeline..."):
         
-        # Cleanup der alten Ergebnisse
-        if os.path.exists("data/results/stats"):
-            shutil.rmtree("data/results/stats")
-        if os.path.exists("data/results/logs"):
-            shutil.rmtree("data/results/logs")
-        if os.path.exists("data/results/poses"):
-            shutil.rmtree("data/results/poses")
-        if os.path.exists("data/results/docking_report.csv"):
-            os.remove("data/results/docking_report.csv")
+        if os.path.exists("data/results"):
+            shutil.rmtree("data/results")
+            os.makedirs("data/results", exist_ok=True)
         
         # 3. Construct Command
         cmd = [
             "snakemake",
-            "data/results/docking_report.csv",
             "--cores", "1",
             "--configfile", "config/config.yaml",
             "--rerun-incomplete"
@@ -65,7 +65,7 @@ if st.button("Launch Docking Pipeline"):
         if process.returncode == 0:
             st.balloons()
             st.success("Docking Completed Successfully!")
-            st.switch_page("pages/4_Results.py")
+            st.switch_page("pages/3_Results.py")
         else:
             st.error("Pipeline Failed.")
             with st.expander("See Error Log"):

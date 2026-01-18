@@ -48,23 +48,53 @@ if structure_known == "Yes":
             view.setStyle({"cartoon": {"color": "spectrum"}})
             view.zoomTo() #zooms to protein
             showmol(view, height = 200, width = 400)
+
+    # Save and prepare receptor
     if target_file:
         # Save to disk
-        receptor_path = os.path.join("data/inputs", "target.pdb")
-        with open(receptor_path, "wb") as f:
+        target_path = os.path.join("data/inputs", "target.pdb")
+        with open(target_path, "wb") as f:
             f.write(target_file.getbuffer())
         
-        st.success(f"Saved: {receptor_path}")
-        save_config({"receptor_path": receptor_path})
+        st.success(f"Saved: {target_path}")
+        save_config({"target_path": target_path})
 
-        # --- VISUALIZATION (Only if uploaded) ---
-        # st.write("### 🧬 Structure Preview")
-        # pdb_str = target_file.getvalue().decode("utf-8")
-        # view = py3Dmol.view(width=800, height=400)
-        # view.addModel(pdb_str, "pdb")
-        # view.setStyle({'cartoon': {'color': 'spectrum'}})
-        # view.zoomTo()
-        # showmol(view, height=400, width=800)
+        if st.button("Run Receptor Preparation"):
+            with st.spinner("Running Python Preparation Script..."):
+                target_output_file = "data/interim/target_prep.pdbqt"
+                
+                cmd = ["snakemake", "--cores", "1", target_output_file, "--rerun-incomplete"]
+                process = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if process.returncode == 0:
+                    st.success("Preparation complete!")
+                    # Visualization logic here...
+                else:
+                    st.error("Preparation failed.")
+                    st.code(process.stderr)
+
+    # save and prepare reference
+    if ref_file:
+        # Save to disk
+        ref_path = os.path.join("data/inputs", "reference.pdb")
+        with open(ref_path, "wb") as f:
+            f.write(ref_file.getbuffer())
+        
+        st.success(f"Saved: {ref_path}")
+        save_config({"ref_path": ref_path})
+
+        if st.button("Run Reference Preparation"):
+            with st.spinner("Running Python Preparation Script..."):
+                target_output_file = "data/interim/reference_prep.pdbqt"
+                
+                cmd = ["snakemake", "--cores", "1", target_output_file, "--rerun-incomplete"]
+                process = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if process.returncode == 0:
+                    st.success("Preparation complete!")
+                else:
+                    st.error("Preparation failed.")
+                    st.code(process.stderr)
 
 else:
     st.info("Structure Unknown. Generate structures with Bioemu")
@@ -119,10 +149,28 @@ if smiles_file:
             
     st.success(f"✅ Successfully created {len(lines)} input files in 'data/inputs/library_split/'")
 
+    if st.button("Run Ligand Preparation"):
+        with st.spinner("Converting all ligands to PDBQT..."):
+
+            target_rule = "prepare_all_ligands"
+            
+            # We pass the rule name directly to snakemake
+            cmd = ["snakemake", "--cores", "1", target_rule]
+            
+            process = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if process.returncode == 0:
+                st.success("All ligands converted successfully!")
+            else:
+                st.error("Ligand Preparation failed.")
+                with st.expander("Error Log"):
+                    st.code(process.stderr)
+
+
 # --- NAVIGATION ---
 st.markdown("---")
-if st.button("Go to Structure Preparation"):
-    st.switch_page("pages/1_Structure_Preparation.py")
+if st.button("Go to Pocket Definition step"):
+    st.switch_page("pages/1_Pocket_Detection.py")
 
 st.sidebar.markdown("---")
 

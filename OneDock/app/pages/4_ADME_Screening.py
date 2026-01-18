@@ -12,12 +12,12 @@ st.markdown("### SwissADME Analysis")
 os.makedirs("data/results/output", exist_ok=True)
 
 # Check if docking results exist
-result_file = "data/results/docking_report.csv"
+result_file = "data/results/docking_report_target.csv"
 
 if not os.path.exists(result_file):
     st.warning("⚠️ No docking results found. Please run the docking pipeline first.")
     if st.button("Go to Docking"):
-        st.switch_page("pages/3_Docking.py")
+        st.switch_page("pages/2_Docking.py")
     st.stop()
 
 # Load docking results
@@ -377,4 +377,4 @@ st.markdown("---")
 col1, col2 = st.columns(2)
 with col1:
     if st.button("← Back to Results"):
-        st.switch_page("pages/4_Results.py")
+        st.switch_page("pages/3_Results.py")

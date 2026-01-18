@@ -33,19 +33,29 @@ pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], i
 
 if pocket_status == "Known":
     st.info("Pocket is known. Please define coordinates.")
-    residue_input = st.text_input("Pocket Residues", placeholder="e.g., A:145,A:230")
+    target_residues = st.text_input("Pocket Residues of target receptor", placeholder="e.g., B:145,B:230")
 
-    if st.button("Save Config"):
+    if st.button("Save Target Config"):
         # Save directly to config.yaml
         save_config({
-            "pocket_residues": residue_input,
+            "pocket_residues": target_residues,
             "grid_size": 20,
             "exhaustiveness": 8
         })
 
+    ref_path = load_config().get("ref_path")
+    if ref_path:
+        target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
+        if st.button("Save Reference Config"):
+            # Save directly to config.yaml
+            save_config({
+                "ref_residues": target_residues
+            })
+
+
     st.session_state.pocket_unknown = False
-    if st.button("Confirm & Proceed to Docking ➡️"):
-        st.switch_page("pages/3_Docking.py")
+    if st.button("Confirm & Proceed to Docking"):
+        st.switch_page("pages/2_Docking.py")
     
 
 else:
@@ -65,7 +75,7 @@ if st.session_state.pocket_unknown == True:
     with open(pdb_file_path, 'r') as f:
         pdb_file = f.read()
         
-    output_path = 'data/results/pocket_detection/'
+    output_path = 'data/interim/pocket_detection/'
     Path(output_path).mkdir(parents = True, exist_ok = True)
 
     st.write('Since you don\'t know the binding pocket of your protein, we will use two \

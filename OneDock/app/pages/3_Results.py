@@ -7,10 +7,12 @@ from rdkit.Chem import Draw
 
 st.title("Results & Ranking")
 
-result_file = "data/results/docking_report.csv"
+report_target = "data/results/docking_report_target.csv"
+report_ref = "data/results/docking_report_reference.csv"
 
-if os.path.exists(result_file):
-    df = pd.read_csv(result_file).sort_values(by="Affinity_kcal_mol")
+st.header("Results: Target Receptor")
+if os.path.exists(report_target):
+    df = pd.read_csv(report_target).sort_values(by="Affinity_kcal_mol")
     
     st.subheader("Docking Scores & Visualization")
     
@@ -70,3 +72,8 @@ if os.path.exists(result_file):
     st.write("Select a ligand to visualize (Placeholder logic)")
 else:
     st.warning("No results found. Please run the docking pipeline first.")
+
+if os.path.exists(report_ref):
+    st.header("Results: Reference Structure")
+    df_ref = pd.read_csv(report_ref)
+    st.dataframe(df_ref)
