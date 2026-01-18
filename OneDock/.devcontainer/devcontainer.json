@@ -27,8 +27,8 @@
   // -----------------------------
   // Workspace mounting
   // -----------------------------
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
-  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/OneDock,type=bind,consistency=cached",
+  "workspaceFolder": "/workspaces/OneDock",
 
   "mounts": [
     "source=/home/shared,target=/home/shared,type=bind,consistency=cached"
