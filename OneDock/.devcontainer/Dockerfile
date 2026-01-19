@@ -62,7 +62,8 @@ RUN /opt/conda/envs/adtools/bin/pip install \
     ipython_genutils \
     stmol \
     bioemu \
-    torch
+    torch \
+    posebusters
 
 # 6. Clean conda caches (IMPORTANT)
 RUN conda clean -afy
