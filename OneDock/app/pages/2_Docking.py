@@ -8,16 +8,6 @@ import os
 
 st.title("Run Docking")
 
-# --- ENGINE SELECTION ---
-engine = st.selectbox("Select Docking Engine", ["AutoDock Vina", "Schrödinger Glide"])
-
-if engine == "Schrödinger Glide":
-    st.warning("⚠️ Ensure you have a valid Schrödinger license in the Docker container.")
-
-save_config({"docking_engine": engine})
-
-# --- EXECUTION ---
-st.markdown("---")
 st.subheader("Pipeline Execution")
 
 if st.button("Launch Docking Pipeline"):

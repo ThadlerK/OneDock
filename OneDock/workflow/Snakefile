@@ -53,7 +53,6 @@ rule prepare_structure:
     params:
         h_flag = get_h_flag
     shell:
-        # [FIX] Changed {output.output_pdbqt} to {output.pdbqt} to match output definition
         "obabel -ipdb {input.pdb} -opdbqt -O {output.pdbqt} -xr {params.h_flag} --partialcharge gasteiger 2> /dev/null"
 
 rule convert_ligand:
@@ -78,7 +77,6 @@ rule run_docking:
         log     = "data/results/{type}/logs/{id}.log",
         summary = "data/results/{type}/stats/{id}.csv"
     params:
-        # [FIX] Now uses the function to get specific residues per type
         residues = get_docking_residues,
         exhaustiveness = config.get("exhaustiveness", 8),
         grid_size = config.get("grid_size", 20)
