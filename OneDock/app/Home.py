@@ -134,7 +134,8 @@ smiles_file = st.file_uploader("Upload Ligand Library (.smi / .csv)", type=["smi
 if smiles_file:
    # 1. Read the file
     content = smiles_file.getvalue().decode("utf-8")
-    lines = [line.strip() for line in content.split('\n') if line.strip()]
+    lines = content.splitlines() 
+    lines = [line.strip() for line in lines if line.strip()]
     
     st.info(f"Found {len(lines)} ligands. Splitting files...")
     

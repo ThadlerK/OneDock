@@ -7,3 +7,4 @@ OneDock/log.err
 OneDock/log.out
 **/sandbox**
 OneDock/config/config.yaml
+**/docking.log
