@@ -19,9 +19,9 @@ Bioinformatics 31, 1322-1324 (2015)
 """)
 
 # Check if docking results exist
-result_file = "data/results/docking_report.csv"
-poses_dir = "data/results/poses"
-receptor_file = "data/interim/receptor_ready.pdbqt"
+result_file = "data/results/docking_report_target.csv"
+poses_dir = "data/results/target/poses"
+receptor_file = "data/interim/target_prep.pdbqt"
 
 if not os.path.exists(result_file):
     st.warning("No docking results found. Please run the docking pipeline first.")

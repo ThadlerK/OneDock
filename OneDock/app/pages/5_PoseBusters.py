@@ -27,8 +27,8 @@ Chem. Sci. 15, 3130-3139 (2024)
 """)
 
 # Check if docking results exist
-result_file = "data/results/docking_report.csv"
-poses_dir = "data/results/poses"
+result_file = "data/results/docking_report_target.csv"
+poses_dir = "data/results/target/poses"
 
 if not os.path.exists(result_file):
     st.warning("No docking results found. Please run the docking pipeline first.")
