@@ -134,14 +134,23 @@ if st.button("Run PoseBusters Validation", type="primary"):
         # Display detailed results
         st.subheader("Detailed Results")
         
-        # Add color coding for quality scores
+        # Add color coding for quality scores and individual test results
         def color_quality_score(val):
-            if val >= 0.8:
+            if val >= 80:
                 return 'background-color: #90EE90'  # Light green
-            elif val >= 0.7:
+            elif val >= 70:
                 return 'background-color: #FFD700'  # Gold
             else:
                 return 'background-color: #FFB6C6'  # Light red
+        
+        def color_test_result(val):
+            """Color individual test results - green for pass, red for fail"""
+            if val == 'pass' or val == True or val == 1.0:
+                return 'background-color: #90EE90'  # Light green
+            elif val == 'fail' or val == False or val == 0.0:
+                return 'background-color: #FFB6C6'  # Light red
+            else:
+                return ''  # No color for other values
         
         # Format the dataframe and reorder columns
         display_df = results_df.copy()
@@ -202,9 +211,15 @@ if st.button("Run PoseBusters Validation", type="primary"):
         
         display_df = display_df.rename(columns=column_descriptions)
         
+        # Apply styling: quality score gets color based on score, test results get pass/fail colors
+        test_columns = [col for col in display_df.columns if col not in ['Ligand ID', 'Quality Score (%)', 'Passed Tests', 'Total Tests', 'Failed Tests Summary']]
+        
         styled_df = display_df.style.applymap(
             color_quality_score,
             subset=['Quality Score (%)']
+        ).applymap(
+            color_test_result,
+            subset=test_columns
         )
         
         st.dataframe(styled_df, use_container_width=True)
@@ -243,22 +258,7 @@ if st.button("Run PoseBusters Validation", type="primary"):
             **No Volume Overlap (Waters):** Checks for volumetric overlaps with waters.
             """)
         
-        # Show failed tests for problematic poses
-        st.subheader("Failed Tests by Pose")
-        
-        for _, row in results_df.iterrows():
-            if row['quality_score'] < 0.8:
-                with st.expander(f"{row['ligand_id']} - Quality Score: {row['quality_score']*100:.1f}%"):
-                    if 'failed_tests_summary' in row and row['failed_tests_summary'] and row['failed_tests_summary'] != 'None':
-                        st.write("Failed tests:")
-                        tests = row['failed_tests_summary'].split(', ')
-                        for test in tests:
-                            st.write(f"- {test}")
-                    else:
-                        st.write("All tests passed or no detailed information available")
-        
         # Download results
-        st.subheader("")
         csv = results_df.to_csv(index=False)
         st.download_button(
             label="Download PoseBusters Results (CSV)",

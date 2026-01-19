@@ -97,7 +97,7 @@ selected_ligand = st.selectbox(
 # Visualization settings
 st.subheader("Visualization Settings")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     protein_style = st.selectbox(
@@ -111,12 +111,17 @@ with col2:
         ["stick", "sphere", "line", "cross", "ball_and_stick"]
     )
 
-with col3:
+# Display options in 2x2 grid
+col1, col2 = st.columns(2)
+with col1:
     show_surface = st.checkbox("Show Surface", value=False)
+    show_interactions = st.checkbox("Show Interacting Residues", value=True, 
+                                     help="Highlights residues within 3.5Å of the ligand in yellow-green")
+with col2:
+    show_docking_box = st.checkbox("Show Docking Box", value=False)
+    show_pocket_residues = st.checkbox("Show Binding Pocket", value=True,
+                                        help="Shows defined pocket residues in cyan")
 
-# Set default values for interactions (no longer configurable)
-show_interactions = True
-show_pocket_residues = True
 interaction_distance = 3.5
 
 # Generate visualization
@@ -150,22 +155,49 @@ if st.button("Generate 3D Visualization", type="primary"):
     # Create visualization
     with st.spinner("Generating 3D visualization..."):
         # Load pocket residues from config
-        from utils import load_config
+        from utils import load_config, calculate_box_from_residues
         config = load_config()
         pocket_residues_str = config.get('pocket_residues', '')
         pocket_residues = [int(r.strip()) for r in pocket_residues_str.split(',') if r.strip().isdigit()] if pocket_residues_str else None
         
+        # Get docking box parameters from config if available
+        box_center = None
+        box_size = None
+        if show_docking_box:
+            center_x = config.get('center_x')
+            center_y = config.get('center_y')
+            center_z = config.get('center_z')
+            size_x = config.get('size_x', 20)
+            size_y = config.get('size_y', 20)
+            size_z = config.get('size_z', 20)
+            
+            if all(v is not None for v in [center_x, center_y, center_z]):
+                box_center = (float(center_x), float(center_y), float(center_z))
+                box_size = (float(size_x), float(size_y), float(size_z))
+            elif pocket_residues:
+                # Calculate box from pocket residues if not in config
+                original_receptor = "data/inputs/target.pdb"
+                if os.path.exists(original_receptor):
+                    box_center, box_size = calculate_box_from_residues(original_receptor, pocket_residues, padding=5.0)
+        
         # Use original uploaded receptor file
         original_receptor = "data/inputs/target.pdb"
+        
+        # Only pass pocket_residues if the checkbox is checked
+        pocket_to_display = pocket_residues if show_pocket_residues else None
         
         html_content = create_py3dmol_visualization(
             receptor_pdb=receptor_pdb,
             ligand_pdb=ligand_pdb,
-            pocket_residues=pocket_residues,
+            pocket_residues=pocket_to_display,
             original_receptor_pdb=original_receptor,
             protein_style=protein_style,
             ligand_style=ligand_style,
             show_surface=show_surface,
+            show_interactions=show_interactions,
+            show_docking_box=show_docking_box,
+            box_center=box_center,
+            box_size=box_size,
             width=900,
             height=700
         )
