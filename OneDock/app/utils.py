@@ -400,6 +400,56 @@ class SwissADMEClient:
             return None
 
 
+def calculate_box_from_residues(pdb_file: str, residue_ids: list, padding: float = 5.0) -> tuple:
+    """
+    Calculate docking box center and size from a list of residue IDs.
+    
+    Arguments:
+        pdb_file: path to PDB file
+        residue_ids: list of residue numbers that define the binding pocket
+        padding: extra space around residues in Angstroms (default: 5.0)
+        
+    Returns:
+        tuple: ((center_x, center_y, center_z), (size_x, size_y, size_z))
+    """
+    try:
+        import numpy as np
+        from Bio.PDB import PDBParser
+        
+        parser = PDBParser(QUIET=True)
+        structure = parser.get_structure('protein', pdb_file)
+        
+        # Collect all atoms from specified residues
+        pocket_atoms = []
+        for model in structure:
+            for chain in model:
+                for residue in chain:
+                    if residue.get_id()[1] in residue_ids:
+                        pocket_atoms.extend([atom.get_coord() for atom in residue.get_atoms()])
+        
+        if not pocket_atoms:
+            return None, None
+        
+        # Convert to numpy array
+        coords = np.array(pocket_atoms)
+        
+        # Calculate bounding box
+        min_coords = coords.min(axis=0)
+        max_coords = coords.max(axis=0)
+        
+        # Calculate center
+        center = (min_coords + max_coords) / 2
+        
+        # Calculate size with padding
+        size = max_coords - min_coords + 2 * padding
+        
+        return tuple(center), tuple(size)
+        
+    except Exception as e:
+        print(f"Error calculating box from residues: {e}")
+        return None, None
+
+
 def calculate_lipinski_violations(mol_weight: float, logp: float, h_donors: int, h_acceptors: int) -> int:
     """
     Calculate Lipinski's Rule of Five violations
@@ -862,6 +912,10 @@ def create_py3dmol_visualization(
     protein_style: str = 'cartoon',
     ligand_style: str = 'stick',
     show_surface: bool = False,
+    show_interactions: bool = False,
+    show_docking_box: bool = False,
+    box_center: tuple = None,
+    box_size: tuple = None,
     width: int = 800,
     height: int = 600
 ) -> str:
@@ -876,6 +930,10 @@ def create_py3dmol_visualization(
         protein_style: visualization style for protein (cartoon, line, stick, sphere, cross)
         ligand_style: visualization style for ligand (stick, sphere, line, cross)
         show_surface: whether to show surface representation
+        show_interactions: whether to show interacting residues with bonds
+        show_docking_box: whether to display the docking box
+        box_center: tuple (x, y, z) coordinates of box center
+        box_size: tuple (x, y, z) dimensions of box
         width: viewer width in pixels
         height: viewer height in pixels
         
@@ -892,11 +950,40 @@ def create_py3dmol_visualization(
         with open(ligand_pdb, 'r') as f:
             ligand_data = f.read()
         
-        # Format pocket residues for selection
+        # Calculate interacting residues if show_interactions is enabled
+        interacting_residues = []
+        if show_interactions:
+            interactions = analyze_protein_ligand_interactions(receptor_to_use, ligand_pdb, distance_cutoff=3.5)
+            interacting_residues = list(set([int(i['receptor_residue_id']) for i in interactions]))
+            
+        
+        # Format pocket residues for selection (cyan color)
         pocket_selection = ""
         if pocket_residues:
             residue_list = ','.join([str(r) for r in pocket_residues])
             pocket_selection = f"resi: [{residue_list}]"
+        
+        # Format interacting residues for selection (yellow-green color)
+        interacting_selection = ""
+        if interacting_residues:
+            residue_list = ','.join([str(r) for r in interacting_residues])
+            interacting_selection = f"resi: [{residue_list}]"
+        
+        # Prepare docking box JavaScript code
+        docking_box_js = ""
+        if show_docking_box and box_center and box_size:
+            cx, cy, cz = box_center
+            sx, sy, sz = box_size
+            
+            docking_box_js = f"""
+                // Draw docking box using addBox
+                viewer.addBox({{
+                    center: {{x: {cx}, y: {cy}, z: {cz}}},
+                    dimensions: {{w: {sx}, h: {sy}, d: {sz}}},
+                    color: 'orange',
+                    opacity: 0.8
+                }});
+            """
         
         # Create HTML with py3Dmol viewer
         html_template = f"""
@@ -911,10 +998,41 @@ def create_py3dmol_visualization(
                     position: relative;
                     margin: 0 auto;
                 }}
+                .legend {{
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: rgba(255, 255, 255, 0.9);
+                    padding: 10px;
+                    border-radius: 5px;
+                    font-family: Arial, sans-serif;
+                    font-size: 12px;
+                    border: 1px solid #ccc;
+                }}
+                .legend-item {{
+                    margin: 5px 0;
+                    display: flex;
+                    align-items: center;
+                }}
+                .legend-color {{
+                    width: 20px;
+                    height: 12px;
+                    margin-right: 8px;
+                    border: 1px solid #333;
+                }}
             </style>
         </head>
         <body>
             <div id="viewer"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: hotpink;"></div>
+                    <span>Ligand</span>
+                </div>
+                {f'<div class="legend-item"><div class="legend-color" style="background: cyan;"></div><span>Binding Pocket</span></div>' if pocket_residues else ''}
+                {f'<div class="legend-item"><div class="legend-color" style="background: yellowgreen;"></div><span>Interacting Residues</span></div>' if show_interactions and interacting_residues else ''}
+                {f'<div class="legend-item"><div class="legend-color" style="background: orange;"></div><span>Docking Box</span></div>' if show_docking_box else ''}
+            </div>
             <script>
                 let viewer = $3Dmol.createViewer("viewer", {{
                     backgroundColor: 'white'
@@ -924,15 +1042,18 @@ def create_py3dmol_visualization(
                 let proteinData = `{receptor_data}`;
                 viewer.addModel(proteinData, "pdb");
                 
-                // Style protein
+                // Style protein (light gray cartoon)
                 viewer.setStyle({{model: 0}}, {{
                     {protein_style}: {{
                         color: 'lightgray'
                     }}
                 }});
                 
-                // Add pocket residues as sticks (addStyle = zusätzlich zum Protein-Style)
-                {"viewer.addStyle({model: 0, " + pocket_selection + "}, {stick: {colorscheme: 'default', radius: 0.25}});" if pocket_residues else ""}
+                // Add pocket residues as cyan sticks (addStyle = zusätzlich zum Protein-Style)
+                {"viewer.addStyle({model: 0, " + pocket_selection + "}, {stick: {colorscheme: 'cyanCarbon', radius: 0.3}});" if pocket_residues else ""}
+                
+                // Add interacting residues as yellow-green sticks with slightly larger radius
+                {"viewer.addStyle({model: 0, " + interacting_selection + "}, {stick: {color: 'yellowgreen', radius: 0.35}});" if show_interactions and interacting_residues else ""}
                 
                 // Add ligand
                 let ligandData = `{ligand_data}`;
@@ -962,6 +1083,8 @@ def create_py3dmol_visualization(
                 
                 // Add surface if requested
                 {"viewer.addSurface($3Dmol.SurfaceType.VDW, {opacity: 0.5, color: 'lightgray'}, {model: 0});" if show_surface else ""}
+                
+                {docking_box_js}
                 
                 // Center and zoom to ligand
                 viewer.zoomTo({{model: 1}});
