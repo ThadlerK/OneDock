@@ -6,18 +6,18 @@ import requests
 from io import StringIO
 
 st.title("ADME Screening")
-st.markdown("### SwissADME Analysis")
+st.markdown("")
 
 # Ensure output directory exists
 os.makedirs("data/results/output", exist_ok=True)
 
 # Check if docking results exist
-result_file = "data/results/docking_report.csv"
+result_file = "data/results/docking_report_target.csv"
 
 if not os.path.exists(result_file):
-    st.warning("⚠️ No docking results found. Please run the docking pipeline first.")
+    st.warning("No docking results found. Please run the docking pipeline first.")
     if st.button("Go to Docking"):
-        st.switch_page("pages/3_Docking.py")
+        st.switch_page("pages/2_Docking.py")
     st.stop()
 
 # Load docking results
@@ -31,7 +31,6 @@ if 'Smiles' in df_sorted.columns:
     df_sorted['SMILES'] = df_sorted['Smiles']
 
 st.subheader("Select Ligands for ADME Screening")
-st.info("Select the top candidates based on docking affinity scores for ADME property prediction.")
 
 # --- SELECTION OPTIONS ---
 selection_mode = st.radio(
@@ -66,7 +65,6 @@ elif selection_mode == "Custom affinity cutoff":
     st.info(f"Found {len(selected_ligands)} ligands with affinity ≤ {affinity_cutoff} kcal/mol")
 
 # --- SWISSADME SUBMISSION ---
-st.markdown("---")
 st.subheader("Submit to SwissADME")
 
 if selected_ligands:
@@ -102,17 +100,15 @@ if selected_ligands:
         6. Upload it below for integration with docking results
         """)
         
-        if st.button("🌐 Open SwissADME in Browser", key="open_swissadme"):
+        if st.button("Open SwissADME in Browser", key="open_swissadme"):
             st.markdown("[Click here to open SwissADME](https://www.swissadme.ch/index.php)", unsafe_allow_html=True)
         
         # --- UPLOAD SWISSADME RESULTS ---
-        st.markdown("---")
         st.subheader("Upload SwissADME Results")
         
         uploaded_adme = st.file_uploader(
             "Upload SwissADME results (.csv)",
-            type=['csv'],
-            help="Download the CSV results from SwissADME and upload here"
+            type=['csv']
         )
         
         if uploaded_adme:
@@ -124,7 +120,6 @@ if selected_ligands:
                 adme_df.to_csv(adme_output_path, index=False)
                 
                 # --- MERGE WITH DOCKING RESULTS ---
-                st.markdown("---")
 
                 # Merge dataframes (assuming 'Name' or 'Molecule Name' column in SwissADME matches Ligand_ID)
                 # You may need to adjust the merge key depending on SwissADME output format
@@ -144,7 +139,7 @@ if selected_ligands:
                 )
                 
                 if not merged_df.empty:
-                    st.success(f"Successfully merged {len(merged_df)} ligands with ADME properties!")
+                    
                     
                     # Mapping: Anzeige-Name -> tatsächlicher Spaltenname in SwissADME / Docking
                     column_mapping = {
@@ -185,7 +180,7 @@ if selected_ligands:
                         # Warnung für wirklich fehlende Felder (falls SwissADME-Export reduziert ist)
                         if missing_columns:
                             st.warning(
-                                "⚠️ Some requested columns are not present in the SwissADME file: "
+                                "Some requested columns are not present in the SwissADME file: "
                                 + ", ".join(missing_columns)
                             )
                     else:
@@ -199,14 +194,13 @@ if selected_ligands:
                     # Download button
                     csv = merged_df.to_csv(index=False).encode('utf-8')
                     st.download_button(
-                        label="📥 Download Combined Results",
+                        label="Download Combined Results",
                         data=csv,
                         file_name="combined_docking_adme.csv",
                         mime="text/csv"
                     )
                     
                     # --- FILTERING OPTIONS ---
-                    st.markdown("---")
                     st.subheader("Druglikeness")
 
                     # Kurzinfo zur Lipinski-Rule-of-Five
@@ -268,7 +262,7 @@ if selected_ligands:
 
                         filtered_df = merged_df[mask]
 
-                        st.info(f"Filtered: {len(filtered_df)} compounds")
+                        st.write(f"Filtered: {len(filtered_df)} compounds")
 
                         # sinnvolle Standardspalten fr die Ansicht
                         cols_to_show = [
@@ -290,11 +284,10 @@ if selected_ligands:
                         )
                     
                     # --- VISUALIZATION ---
-                    st.markdown("---")
-                    st.subheader("Visual Analysis")
+                    st.subheader("Molecular Structures of Lead Compounds")
                     
                     # Molecular structure viewer
-                    st.markdown("**Molecular Structures:**")
+                    st.markdown("")
                     compound_to_view = st.selectbox(
                         "Select compound:",
                         options=filtered_df['Ligand_ID'].tolist() if 'Ligand_ID' in filtered_df.columns else [],
@@ -339,11 +332,9 @@ if selected_ligands:
                                 else:
                                     st.error("Could not parse SMILES structure")
                             except ImportError:
-                                st.warning("⚠️ RDKit not installed. Install with: `pip install rdkit`")
+                                st.warning("RDKit not installed. Install with: `pip install rdkit`")
                             except Exception as e:
                                 st.error(f"Error displaying structure: {str(e)}")
-                    
-                    st.markdown("---")
                     
                     # Create scatter plot if relevant columns exist
                     if 'Molecular Weight' in merged_df.columns and 'TPSA' in merged_df.columns:
@@ -361,7 +352,7 @@ if selected_ligands:
                         st.plotly_chart(fig, use_container_width=True)
                     
                 else:
-                    st.warning("⚠️ Could not merge results. Check that ligand names match between files.")
+                    st.warning("Could not merge results. Check that ligand names match between files.")
                     st.write("Docking ligand names:", df_sorted['Ligand_ID'].head().tolist())
                     st.write("ADME column names:", adme_df.columns.tolist())
                 
@@ -373,8 +364,7 @@ else:
     st.warning("Please select ligands to proceed with ADME screening.")
 
 # --- NAVIGATION ---
-st.markdown("---")
 col1, col2 = st.columns(2)
 with col1:
     if st.button("← Back to Results"):
-        st.switch_page("pages/4_Results.py")
+        st.switch_page("pages/3_Results.py")

@@ -30,16 +30,14 @@ COORDS=$(python3 -c "
 import sys
 
 pdbqt_file = sys.argv[1]
-residue_str = sys.argv[2] # Format 'A:123,B:456' or '123,456'
+residue_str = sys.argv[2] 
 
-# Parse target residues
 targets = set()
 for item in residue_str.split(','):
     if ':' in item:
         chain, resnum = item.split(':')
         targets.add((chain, int(resnum)))
     else:
-        # Handle case where no chain is provided (assume matching any chain or blank)
         targets.add(('*', int(item)))
 
 coords = []
@@ -48,20 +46,27 @@ with open(pdbqt_file, 'r') as f:
     for line in f:
         if line.startswith('ATOM') or line.startswith('HETATM'):
             try:
-                # PDBQT column positions (1-based index):
-                # ChainID: col 22 (index 21)
-                # ResSeq:  col 23-26 (index 22-26)
-                # X: 31-38, Y: 39-46, Z: 47-54
-                
+                # PDBQT columns: ChainID (21), ResSeq (22-26)
                 chain_id = line[21].strip()
                 res_seq = int(line[22:26].strip())
                 
                 match = False
+                
+                # Exact Match (e.g. File 'A', Input 'A')
                 if (chain_id, res_seq) in targets:
                     match = True
+                
+                # Wildcard Input Match (e.g. File 'A', Input '*')
                 elif ('*', res_seq) in targets:
                     match = True
                 
+                # 3. Missing Chain in File Fallback
+                # If file has NO chain (''), but residue number matches a requested residue (e.g. Input 'A:123')
+                elif chain_id == '':
+                     # Check if this residue number exists in ANY of our targets
+                     if any(t_res == res_seq for (t_chain, t_res) in targets):
+                         match = True
+
                 if match:
                     x = float(line[30:38])
                     y = float(line[38:46])
@@ -73,7 +78,6 @@ with open(pdbqt_file, 'r') as f:
 if not coords:
     print('ERROR')
 else:
-    # Calculate geometric center
     avg_x = sum(c[0] for c in coords) / len(coords)
     avg_y = sum(c[1] for c in coords) / len(coords)
     avg_z = sum(c[2] for c in coords) / len(coords)

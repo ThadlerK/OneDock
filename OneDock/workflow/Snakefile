@@ -2,22 +2,58 @@
 
 configfile: "config/config.yaml"
 
+# Get ligand IDs from the split library
 LIGAND_IDS, = glob_wildcards("data/inputs/library_split/{id}.smi")
+
+# Define what to run: always target, optionally reference
+DOCKING_TARGETS = ["target"]
+if config.get("ref_path"):
+    DOCKING_TARGETS.append("reference")
+
+# --- Python Helper Functions ---
+
+def get_structure_input(wildcards):
+    """Decides which PDB file to use based on the type (target vs reference)."""
+    if wildcards.type == "target":
+        return config.get("target_path", "data/inputs/target.pdb")
+    elif wildcards.type == "reference":
+        return config.get("ref_path", "data/inputs/reference.pdb")
+    else:
+        raise ValueError(f"Unknown structure type: {wildcards.type}")
+
+def get_h_flag(wildcards):
+    """Decides if hydrogens (-h) need to be added via OpenBabel."""
+    # BioEmu (usually the target) already has hydrogens -> return empty string
+    if wildcards.type == "target" and not config.get("structure_known", True):
+        return ""
+    # Reference structures and standard uploads usually need hydrogens
+    return "-h"
+
+def get_docking_residues(wildcards):
+    """Returns the specific residues for target vs reference."""
+    if wildcards.type == "target":
+        return config.get("pocket_residues", "")
+    elif wildcards.type == "reference":
+        # Requires 'ref_residues' to be in your config.yaml
+        return config.get("ref_residues", "")
+    return ""
+
+# --- Rules ---
 
 rule all:
     input:
-        "data/results/docking_report.csv"
+        expand("data/results/docking_report_{type}.csv", type=DOCKING_TARGETS)
 
-# Structure Preparation ---
+# Structure Preparation
 rule prepare_structure:
     input:
-        pdb = config.get("receptor_path", "data/inputs/target.pdb")
+        pdb = get_structure_input
     output:
-        output_pdbqt = "data/interim/receptor_ready.pdbqt"
+        pdbqt = "data/interim/{type}_prep.pdbqt"
     params:
-        h_flag = "" if not config.get("structure_known", True) else "-h"
+        h_flag = get_h_flag
     shell:
-        "obabel -ipdb {input.pdb} -opdbqt -O {output.output_pdbqt} -xr {params.h_flag} --partialcharge gasteiger 2> /dev/null"
+        "obabel -ipdb {input.pdb} -opdbqt -O {output.pdbqt} -xr {params.h_flag} --partialcharge gasteiger 2> /dev/null"
 
 rule convert_ligand:
     input:
@@ -34,14 +70,14 @@ rule prepare_all_ligands:
 # Docking
 rule run_docking:
     input:
-        receptor = "data/interim/receptor_ready.pdbqt",
+        receptor = "data/interim/{type}_prep.pdbqt",
         ligand   = "data/interim/ligands/{id}.pdbqt"
     output:
-        docked  = "data/results/poses/{id}_docked.pdbqt",
-        log     = "data/results/logs/{id}.log",
-        summary = "data/results/stats/{id}.csv"
+        docked  = "data/results/{type}/poses/{id}_docked.pdbqt",
+        log     = "data/results/{type}/logs/{id}.log",
+        summary = "data/results/{type}/stats/{id}.csv"
     params:
-        residues = config.get("pocket_residues", ""),
+        residues = get_docking_residues,
         exhaustiveness = config.get("exhaustiveness", 8),
         grid_size = config.get("grid_size", 20)
     shell:
@@ -57,18 +93,18 @@ rule run_docking:
             "{params.exhaustiveness}"
         """
 
-# --- AGGREGATION ---
+# Aggregation per Type
 rule aggregate_results:
     input:
-        expand("data/results/stats/{id}.csv", id=LIGAND_IDS)
+        # Double curly braces {{type}} allow the wildcard to pass through expand
+        expand("data/results/{{type}}/stats/{id}.csv", id=LIGAND_IDS)
     output:
-        "data/results/docking_report.csv"
+        "data/results/docking_report_{type}.csv"
     shell:
         """
         echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > {output}
-        if [ -n "{input}" ]; then
-            tail -n +2 -q {input} >> {output}
-        fi
+        # Concatenate all csvs, skipping the header line
+        tail -n +2 -q {input} >> {output}
         """
 
 # --- BIOEMU STEP ---
