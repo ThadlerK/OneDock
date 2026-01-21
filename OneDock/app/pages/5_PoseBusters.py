@@ -38,31 +38,77 @@ if not os.path.exists(result_file):
 
 # Load docking results
 df = pd.read_csv(result_file)
+
+# Load reference results if available for specificity calculation
+ref_file = "data/results/docking_report_reference.csv"
+if os.path.exists(ref_file):
+    df_ref = pd.read_csv(ref_file)
+    
+    df = df.merge(
+        df_ref[['Ligand', 'Affinity_kcal_mol']],
+        on='Ligand',
+        how='left',
+        suffixes=('', '_ref')
+    )
+    df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
+    has_specificity = True
+else:
+    has_specificity = False
+
 df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
 st.subheader("PoseBusters Configuration")
 
-validation_mode = st.radio(
-    "Validation Mode:",
-    ["All poses", "Top N poses", "Manual selection"]
-)
+# --- INITIALIZE SESSION STATE ---
+if 'affinity_cutoff' not in st.session_state:
+    st.session_state.affinity_cutoff = -3.0
+if 'specificity_cutoff' not in st.session_state:
+    st.session_state.specificity_cutoff = 0.0
 
-# Selection logic
-selected_ligands = []
+# --- CUSTOM CUTOFF FILTERS ---
+col1, col2 = st.columns(2)
 
-if validation_mode == "Top N poses":
-    n_top = st.slider("Number of top poses to validate", min_value=1, max_value=min(50, len(df_sorted)), value=10)
-    selected_ligands = df_sorted.head(n_top)['Ligand'].tolist()
-
-elif validation_mode == "Manual selection":
-    selected_ligands = st.multiselect(
-        "Select ligands to validate:",
-        options=df_sorted['Ligand'].tolist(),
-        default=df_sorted.head(5)['Ligand'].tolist()
+with col1:
+    affinity_cutoff = st.number_input(
+        "Target Affinity ≤ (kcal/mol):",
+        value=st.session_state.affinity_cutoff,
+        step=0.5,
+        key='pb_affinity'
     )
+    st.session_state.affinity_cutoff = affinity_cutoff
 
-else:  # All poses
-    selected_ligands = df_sorted['Ligand'].tolist()
+with col2:
+    if has_specificity:
+        specificity_cutoff = st.number_input(
+            "Specificity ≤:",
+            value=st.session_state.specificity_cutoff,
+            step=0.5,
+            key='pb_specificity'
+        )
+        st.session_state.specificity_cutoff = specificity_cutoff
+    else:
+        st.info("No reference data - specificity filter not available")
+        specificity_cutoff = None
+
+# Apply filters
+if has_specificity and specificity_cutoff is not None:
+    selected_df = df_sorted[
+        (df_sorted['Affinity_kcal_mol'] <= affinity_cutoff) &
+        (df_sorted['Specificity'] <= specificity_cutoff)
+    ]
+else:
+    selected_df = df_sorted[
+        df_sorted['Affinity_kcal_mol'] <= affinity_cutoff
+    ]
+
+selected_ligands = selected_df['Ligand'].tolist()
+
+# Display selection
+display_cols = ['Ligand', 'Affinity_kcal_mol']
+if has_specificity:
+    display_cols.append('Specificity')
+
+st.dataframe(selected_df[display_cols], height=250)
 
 # Run PoseBusters
 if st.button("Run PoseBusters Validation", type="primary"):
@@ -144,13 +190,8 @@ if st.button("Run PoseBusters Validation", type="primary"):
                 return 'background-color: #FFB6C6'  # Light red
         
         def color_test_result(val):
-            """Color individual test results - green for pass, red for fail"""
-            if val == 'pass' or val == True or val == 1.0:
-                return 'background-color: #90EE90'  # Light green
-            elif val == 'fail' or val == False or val == 0.0:
-                return 'background-color: #FFB6C6'  # Light red
-            else:
-                return ''  # No color for other values
+            """No coloring for test results"""
+            return ''  # No color
         
         # Format the dataframe and reorder columns
         display_df = results_df.copy()
@@ -161,11 +202,17 @@ if st.button("Run PoseBusters Validation", type="primary"):
         column_order = [
             'ligand_id',
             'quality_score',
+            'mol_pred_loaded',
+            'mol_cond_loaded',
+            'sanitization',
+            'inchi_convertible',
             'all_atoms_connected',
+            'no_radicals',
             'bond_lengths',
             'bond_angles',
             'internal_steric_clash',
             'aromatic_ring_flatness',
+            'non-aromatic_ring_non-flatness',
             'double_bond_flatness',
             'internal_energy',
             'minimum_distance_to_protein',
@@ -189,11 +236,17 @@ if st.button("Run PoseBusters Validation", type="primary"):
         column_descriptions = {
             'ligand_id': 'Ligand ID',
             'quality_score': 'Quality Score (%)',
+            'mol_pred_loaded': 'Mol Pred Loaded',
+            'mol_cond_loaded': 'Mol Cond Loaded',
+            'sanitization': 'Sanitization',
+            'inchi_convertible': 'InChI Convertible',
             'all_atoms_connected': 'All Atoms Connected',
+            'no_radicals': 'No Radicals',
             'bond_lengths': 'Bond Lengths Valid',
             'bond_angles': 'Bond Angles Valid',
             'internal_steric_clash': 'No Internal Clashes',
             'aromatic_ring_flatness': 'Aromatic Rings Flat',
+            'non-aromatic_ring_non-flatness': 'Non-Aromatic Ring Non-Flatness',
             'double_bond_flatness': 'Double Bonds Flat',
             'internal_energy': 'Internal Energy OK',
             'minimum_distance_to_protein': 'Min Distance to Protein',
@@ -222,7 +275,7 @@ if st.button("Run PoseBusters Validation", type="primary"):
             subset=test_columns
         )
         
-        st.dataframe(styled_df, use_container_width=True)
+        st.dataframe(styled_df, use_container_width=True, height=400)
         
         # Show test descriptions
         with st.expander("Parameter Information"):

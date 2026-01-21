@@ -22,47 +22,81 @@ if not os.path.exists(result_file):
 
 # Load docking results
 df = pd.read_csv(result_file)
-df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
 # Rename columns for clarity
-if 'Ligand' in df_sorted.columns:
-    df_sorted['Ligand_ID'] = df_sorted['Ligand']
-if 'Smiles' in df_sorted.columns:
-    df_sorted['SMILES'] = df_sorted['Smiles']
+if 'Ligand' in df.columns:
+    df['Ligand_ID'] = df['Ligand']
+if 'Smiles' in df.columns:
+    df['SMILES'] = df['Smiles']
+
+# Load reference results if available for specificity calculation
+ref_file = "data/results/docking_report_reference.csv"
+if os.path.exists(ref_file):
+    df_ref = pd.read_csv(ref_file)
+    if 'Ligand' in df_ref.columns:
+        df_ref = df_ref.rename(columns={'Ligand': 'Ligand_ID'})
+    
+    df = df.merge(
+        df_ref[['Ligand_ID', 'Affinity_kcal_mol']],
+        on='Ligand_ID',
+        how='left',
+        suffixes=('', '_ref')
+    )
+    df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
+    has_specificity = True
+else:
+    has_specificity = False
+
+df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
 st.subheader("Select Ligands for ADME Screening")
 
-# --- SELECTION OPTIONS ---
-selection_mode = st.radio(
-    "Selection Method:",
-    ["Top N ligands", "Manual selection", "Custom affinity cutoff"]
-)
+# --- INITIALIZE SESSION STATE ---
+if 'affinity_cutoff' not in st.session_state:
+    st.session_state.affinity_cutoff = -3.0
+if 'specificity_cutoff' not in st.session_state:
+    st.session_state.specificity_cutoff = 0.0
 
-selected_ligands = []
+# --- CUSTOM CUTOFF FILTERS ---
+col1, col2 = st.columns(2)
 
-if selection_mode == "Top N ligands":
-    n_top = st.slider("Select top N ligands", min_value=1, max_value=min(50, len(df_sorted)), value=10)
-    selected_df = df_sorted.head(n_top)[['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
-    selected_ligands = df_sorted.head(n_top)['Ligand_ID'].tolist()
-    st.dataframe(selected_df, height=250)
-
-elif selection_mode == "Manual selection":
-    ligand_options = df_sorted['Ligand_ID'].tolist()
-    selected_ligands = st.multiselect("Select ligands:", ligand_options, default=ligand_options[:5])
-    if selected_ligands:
-        selected_df = df_sorted[df_sorted['Ligand_ID'].isin(selected_ligands)][['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
-        st.dataframe(selected_df, height=250)
-
-elif selection_mode == "Custom affinity cutoff":
+with col1:
     affinity_cutoff = st.number_input(
-        "Select ligands with affinity ≤ (kcal/mol):",
-        value=-7.0,
-        step=0.5
+        "Target Affinity ≤ (kcal/mol):",
+        value=st.session_state.affinity_cutoff,
+        step=0.5,
+        key='adme_affinity'
     )
-    selected_df = df_sorted[df_sorted['Affinity_kcal_mol'] <= affinity_cutoff][['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
-    selected_ligands = selected_df['Ligand_ID'].tolist()
-    st.dataframe(selected_df, height=250)
-    st.info(f"Found {len(selected_ligands)} ligands with affinity ≤ {affinity_cutoff} kcal/mol")
+    st.session_state.affinity_cutoff = affinity_cutoff
+
+with col2:
+    if has_specificity:
+        specificity_cutoff = st.number_input(
+            "Specificity ≤:",
+            value=st.session_state.specificity_cutoff,
+            step=0.5,
+            key='adme_specificity'
+        )
+        st.session_state.specificity_cutoff = specificity_cutoff
+    else:
+        st.info("No reference data - specificity filter not available")
+        specificity_cutoff = None
+
+# Apply filters
+if has_specificity and specificity_cutoff is not None:
+    selected_df = df_sorted[
+        (df_sorted['Affinity_kcal_mol'] <= affinity_cutoff) &
+        (df_sorted['Specificity'] <= specificity_cutoff)
+    ][['Ligand_ID', 'Affinity_kcal_mol', 'Specificity', 'SMILES']].copy()
+else:
+    selected_df = df_sorted[
+        df_sorted['Affinity_kcal_mol'] <= affinity_cutoff
+    ][['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
+
+selected_ligands = selected_df['Ligand_ID'].tolist()
+
+st.dataframe(selected_df, height=250)
+st.info(f"Found {len(selected_ligands)} ligands matching criteria")
 
 # --- SWISSADME SUBMISSION ---
 st.subheader("Submit to SwissADME")

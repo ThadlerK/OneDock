@@ -31,6 +31,23 @@ if not os.path.exists(result_file):
 
 # Load docking results
 df = pd.read_csv(result_file)
+
+# Load reference results if available for specificity calculation
+ref_file = "data/results/docking_report_reference.csv"
+if os.path.exists(ref_file):
+    df_ref = pd.read_csv(ref_file)
+    
+    df = df.merge(
+        df_ref[['Ligand', 'Affinity_kcal_mol']],
+        on='Ligand',
+        how='left',
+        suffixes=('', '_ref')
+    )
+    df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
+    has_specificity = True
+else:
+    has_specificity = False
+
 df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
 # Load PoseBusters results if available
@@ -49,34 +66,47 @@ if has_pb_results:
 
 st.subheader("Select Ligand for Visualization")
 
-# Filter options
+# --- INITIALIZE SESSION STATE ---
+if 'affinity_cutoff' not in st.session_state:
+    st.session_state.affinity_cutoff = -3.0
+if 'specificity_cutoff' not in st.session_state:
+    st.session_state.specificity_cutoff = 0.0
+
+# --- CUSTOM CUTOFF FILTERS ---
 col1, col2 = st.columns(2)
 
 with col1:
-    sort_options = ["Affinity", "Ligand ID"]
-    if has_pb_results:
-        sort_options.insert(1, "Quality Score")
-    
-    sort_by = st.selectbox(
-        "Sort by:",
-        sort_options
+    affinity_cutoff = st.number_input(
+        "Target Affinity ≤ (kcal/mol):",
+        value=st.session_state.affinity_cutoff,
+        step=0.5,
+        key='py3d_affinity'
     )
+    st.session_state.affinity_cutoff = affinity_cutoff
 
 with col2:
-    show_top_n = st.number_input(
-        "Show top Ligands:",
-        min_value=5,
-        max_value=len(df_sorted),
-        value=min(20, len(df_sorted))
-    )
+    if has_specificity:
+        specificity_cutoff = st.number_input(
+            "Specificity ≤:",
+            value=st.session_state.specificity_cutoff,
+            step=0.5,
+            key='py3d_specificity'
+        )
+        st.session_state.specificity_cutoff = specificity_cutoff
+    else:
+        st.info("No reference data - specificity filter not available")
+        specificity_cutoff = None
 
-# Apply sorting
-if sort_by == "Affinity":
-    df_display = df_sorted.head(show_top_n)
-elif sort_by == "Quality Score" and has_pb_results:
-    df_display = df_sorted.sort_values(by='quality_score', ascending=False).head(show_top_n)
-else:  # Ligand ID
-    df_display = df_sorted.sort_values(by='Ligand').head(show_top_n)
+# Apply filters
+if has_specificity and specificity_cutoff is not None:
+    df_display = df_sorted[
+        (df_sorted['Affinity_kcal_mol'] <= affinity_cutoff) &
+        (df_sorted['Specificity'] <= specificity_cutoff)
+    ]
+else:
+    df_display = df_sorted[
+        df_sorted['Affinity_kcal_mol'] <= affinity_cutoff
+    ]
 
 # Display table with selection
 st.write(f"Showing {len(df_display)} ligands:")
@@ -88,10 +118,22 @@ if has_pb_results:
 if 'Smiles' in df_display.columns:
     display_cols.append('Smiles')
 
+# Create format function for selectbox
+def format_ligand_label(x):
+    affinity = df_display[df_display['Ligand']==x]['Affinity_kcal_mol'].values[0]
+    label = f"{x} (Affinity: {affinity:.2f}"
+    
+    if has_specificity and 'Specificity' in df_display.columns:
+        specificity = df_display[df_display['Ligand']==x]['Specificity'].values[0]
+        label += f", Specificity: {specificity:.2f}"
+    
+    label += " kcal/mol)"
+    return label
+
 selected_ligand = st.selectbox(
     "Choose a ligand to visualize:",
     options=df_display['Ligand'].tolist(),
-    format_func=lambda x: f"{x} (Affinity: {df_display[df_display['Ligand']==x]['Affinity_kcal_mol'].values[0]:.2f} kcal/mol)"
+    format_func=format_ligand_label
 )
 
 # Visualization settings
