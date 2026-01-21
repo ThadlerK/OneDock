@@ -16,14 +16,14 @@ st.set_page_config(
 )
 
 st.image("app/images/logo_dunkel.png")
-st.markdown("<p style='text-align: center; font-weight: bold; font-size: 16px;'>The best way to find the most promising Ligands for your Protein</p>", 
+st.markdown("<p style='text-align: center; font-weight: bold; font-size: 16px;'>The easiest way to find the most promising Ligands for your Protein</p>", 
             unsafe_allow_html = True)
 st.space("small")
 
 st.write("Welcome to your protein-ligand matchmaker! \n" \
          "If you want to find out which ligands might bind to your protein, \n" \
         "you have come to the right place. \n" \
-        "With OneDock, you have many different possibilities:")
+        "OneDock can be applied in multiple ways:")
 
 
 st.space("medium")
@@ -110,7 +110,7 @@ with col6:
              unsafe_allow_html = True)
 
 st.space("medium")
-col1, col2, col3 = st.columns([2, 1, 2])
+col1, col2, col3 = st.columns([1.5, 1, 1.5])
 with col2:
     if st.button("Start the Docking Pipeline"):
         st.switch_page("pages/0_Input_page.py")
