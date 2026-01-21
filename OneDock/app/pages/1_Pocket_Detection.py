@@ -13,6 +13,10 @@ from Bio.PDB import PDBParser
 from Bio.Data.IUPACData import protein_letters_3to1
 from utils import filter_P2Rank, P2Rank_to_PDB, pocket_comparison, run_fpocket, save_config, load_config
 
+st.set_page_config(
+    page_title = "Pocket detection",
+    page_icon = "app/images/logo_protein.png"
+)
 
 #set the session states
 if "pocket_unknown" not in st.session_state:
@@ -71,7 +75,7 @@ else:
 if st.session_state.pocket_unknown == True:
     #pdb_file = st.file_uploader(label = 'Upload your PBD file here',
      #                           type = 'pdb')
-    pdb_file_path = load_config().get("receptor_path")
+    pdb_file_path = load_config().get("target_path")
     with open(pdb_file_path, 'r') as f:
         pdb_file = f.read()
         
@@ -351,5 +355,5 @@ if st.session_state.pocket_unknown == True:
                                     pass
                 st.write(','.join(sorted(residues)))
                 if st.button("save the residues for docking"):
-                    save_config({"pocket-residues": ','.join(sorted(residues))})
+                    save_config({"pocket_residues": ','.join(sorted(residues))})
                                 
