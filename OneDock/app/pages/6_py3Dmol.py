@@ -71,6 +71,12 @@ if 'affinity_cutoff' not in st.session_state:
     st.session_state.affinity_cutoff = -3.0
 if 'specificity_cutoff' not in st.session_state:
     st.session_state.specificity_cutoff = 0.0
+if 'py3dmol_selected_ligand' not in st.session_state:
+    st.session_state.py3dmol_selected_ligand = None
+if 'py3dmol_visualization' not in st.session_state:
+    st.session_state.py3dmol_visualization = None
+if 'py3dmol_just_created' not in st.session_state:
+    st.session_state.py3dmol_just_created = False
 
 # --- CUSTOM CUTOFF FILTERS ---
 col1, col2 = st.columns(2)
@@ -130,14 +136,92 @@ def format_ligand_label(x):
     label += " kcal/mol)"
     return label
 
+# Check if a ligand was preselected from Summary page
+if 'py3dmol_preselected_ligand' in st.session_state and st.session_state.py3dmol_preselected_ligand:
+    preselected = st.session_state.py3dmol_preselected_ligand
+    # Check if the preselected ligand is in the filtered list
+    if preselected in df_display['Ligand'].tolist():
+        default_index = df_display['Ligand'].tolist().index(preselected)
+    else:
+        default_index = 0
+    # Clear the preselection
+    st.session_state.py3dmol_preselected_ligand = None
+else:
+    default_index = 0
+
 selected_ligand = st.selectbox(
     "Choose a ligand to visualize:",
     options=df_display['Ligand'].tolist(),
-    format_func=format_ligand_label
+    format_func=format_ligand_label,
+    index=default_index
 )
 
+# Store selected ligand in session state
+st.session_state.py3dmol_selected_ligand = selected_ligand
+
+# Reset the flag at page load (before checking for saved visualization)
+if 'py3dmol_just_created' not in st.session_state:
+    st.session_state.py3dmol_just_created = False
+    
+# Only reset to False if we're loading the page fresh (not after creating viz)
+if st.session_state.py3dmol_just_created:
+    # Mark that we've shown the newly created viz once
+    st.session_state.py3dmol_just_created = False
+
+# --- DISPLAY PREVIOUSLY SAVED VISUALIZATION ---
+# Show saved visualization if it exists
+if st.session_state.py3dmol_visualization is not None:
+    viz_data = st.session_state.py3dmol_visualization
+    
+    st.subheader(f"3D Visualization: {viz_data['ligand_id']}")
+    
+    # Display the saved visualization
+    components.html(viz_data['html_content'], height=650, scrolling=False)
+    
+    # Show ligand information
+    ligand_info = viz_data['ligand_info']
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Binding Affinity", f"{ligand_info['Affinity_kcal_mol']:.2f} kcal/mol")
+    
+    with col2:
+        if has_pb_results and 'quality_score' in ligand_info:
+            quality = ligand_info['quality_score'] * 100
+            st.metric("Quality Score", f"{quality:.1f}%")
+        else:
+            st.metric("Quality Score", "N/A")
+    
+    with col3:
+        st.metric("Ligand ID", viz_data['ligand_id'])
+    
+    # Display settings used
+    with st.expander("Visualization Settings Used"):
+        settings = viz_data['settings']
+        st.write(f"**Protein Style:** {settings['protein_style']}")
+        st.write(f"**Ligand Style:** {settings['ligand_style']}")
+        st.write(f"**Show Surface:** {settings['show_surface']}")
+        st.write(f"**Show Interactions:** {settings['show_interactions']}")
+        st.write(f"**Show Docking Box:** {settings['show_docking_box']}")
+        st.write(f"**Show Pocket Residues:** {settings['show_pocket_residues']}")
+    
+    # Download button for saved visualization
+    st.download_button(
+        label="Download Visualization (HTML)",
+        data=viz_data['html_content'],
+        file_name=f"{viz_data['ligand_id']}_visualization.html",
+        mime="text/html"
+    )
+    
+    if st.button("Create New Visualization"):
+        st.session_state.py3dmol_visualization = None
+        st.rerun()
+    
+    st.stop()
+
 # Visualization settings
-st.subheader("Visualization Settings")
+st.subheader("Create New Visualization")
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -245,6 +329,22 @@ if st.button("Generate 3D Visualization", type="primary"):
         )
     
     if html_content:
+        # Store visualization in session state and mark as just created
+        st.session_state.py3dmol_visualization = {
+            'html_content': html_content,
+            'ligand_id': selected_ligand,
+            'ligand_info': df_display[df_display['Ligand'] == selected_ligand].iloc[0].to_dict(),
+            'settings': {
+                'protein_style': protein_style,
+                'ligand_style': ligand_style,
+                'show_surface': show_surface,
+                'show_interactions': show_interactions,
+                'show_docking_box': show_docking_box,
+                'show_pocket_residues': show_pocket_residues
+            }
+        }
+        st.session_state.py3dmol_just_created = True
+        
         st.subheader(f"3D Visualization: {selected_ligand}")
         
         # Display the interactive 3D viewer

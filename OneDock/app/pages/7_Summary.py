@@ -10,6 +10,11 @@ st.set_page_config(layout="wide", page_title="Summary Report")
 
 st.title("Summary Report")
 
+# Add reload button
+if st.button("Reload Data"):
+    st.cache_data.clear()
+    st.rerun()
+
 # --- HELPER FUNCTIONS ---
 
 def get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5):
@@ -119,6 +124,49 @@ def load_summary_data(target_path, ref_path):
     
     df['Pocket_Residues'] = pocket_residues_list
     
+    # Load PoseBusters results if available
+    pb_results_file = "data/results/posebusters/posebusters_validation.csv"
+    if os.path.exists(pb_results_file):
+        pb_df = pd.read_csv(pb_results_file)
+        pb_df['PoseBusters_Score'] = (pb_df['quality_score'] * 100).round(1)
+        df = df.merge(pb_df[['ligand_id', 'PoseBusters_Score']], left_on='Ligand', right_on='ligand_id', how='left')
+        df = df.drop(columns=['ligand_id'], errors='ignore')
+    
+    # Calculate Lipinski Rule of Five compliance
+    from rdkit.Chem import Descriptors
+    ro5_status_list = []
+    
+    for idx, row in df.iterrows():
+        if 'Smiles' in row and row['Smiles']:
+            try:
+                mol = Chem.MolFromSmiles(row['Smiles'])
+                if mol:
+                    mw = Descriptors.MolWt(mol)
+                    logp = Descriptors.MolLogP(mol)
+                    hbd = Descriptors.NumHDonors(mol)
+                    hba = Descriptors.NumHAcceptors(mol)
+                    
+                    violations = 0
+                    if mw > 500: violations += 1
+                    if logp > 5: violations += 1
+                    if hbd > 5: violations += 1
+                    if hba > 10: violations += 1
+                    
+                    if violations == 0:
+                        ro5_status_list.append('Pass')
+                    elif violations == 1:
+                        ro5_status_list.append('Pass (1 violation)')
+                    else:
+                        ro5_status_list.append('Fail')
+                else:
+                    ro5_status_list.append('N/A')
+            except:
+                ro5_status_list.append('N/A')
+        else:
+            ro5_status_list.append('N/A')
+    
+    df['Lipinski_RO5'] = ro5_status_list
+    
     # Sort by affinity (best first)
     df = df.sort_values('Affinity_Target', ascending=True)
     
@@ -132,21 +180,73 @@ if df is None:
         st.switch_page("pages/2_Docking.py")
     st.stop()
 
+# --- INITIALIZE SESSION STATE ---
+if 'affinity_cutoff' not in st.session_state:
+    st.session_state.affinity_cutoff = -3.0
+if 'specificity_cutoff' not in st.session_state:
+    st.session_state.specificity_cutoff = 0.0
+
+# --- FILTER CONTROLS ---
+has_specificity = df['Specificity'].notna().any()
+
+col1, col2 = st.columns(2)
+
+with col1:
+    affinity_cutoff = st.number_input(
+        "Target Affinity ≤ (kcal/mol):",
+        value=st.session_state.affinity_cutoff,
+        step=0.5,
+        key='summary_affinity'
+    )
+    st.session_state.affinity_cutoff = affinity_cutoff
+
+with col2:
+    if has_specificity:
+        specificity_cutoff = st.number_input(
+            "Specificity ≤:",
+            value=st.session_state.specificity_cutoff,
+            step=0.5,
+            key='summary_specificity'
+        )
+        st.session_state.specificity_cutoff = specificity_cutoff
+    else:
+        st.info("No reference data - specificity filter not available")
+        specificity_cutoff = None
+
+# --- APPLY FILTERS ---
+if has_specificity and specificity_cutoff is not None:
+    df = df[
+        (df['Affinity_Target'] <= affinity_cutoff) &
+        (df['Specificity'] <= specificity_cutoff)
+    ]
+else:
+    df = df[df['Affinity_Target'] <= affinity_cutoff]
+
 # --- DISPLAY SUMMARY TABLE ---
 st.subheader("Summary Table")
 
 # Prepare display dataframe
 display_columns = ['Ligand', 'Affinity_Target', 'Specificity', 'Pocket_Residues']
+if 'PoseBusters_Score' in df.columns:
+    display_columns.append('PoseBusters_Score')
+if 'Lipinski_RO5' in df.columns:
+    display_columns.append('Lipinski_RO5')
 if 'Smiles' in df.columns:
     display_columns.append('Smiles')
 
 df_display = df[display_columns].copy()
 
 # Rename for better display
-df_display = df_display.rename(columns={
+rename_dict = {
     'Affinity_Target': 'Target (kcal/mol)',
     'Pocket_Residues': 'Pocket Residues'
-})
+}
+if 'PoseBusters_Score' in df_display.columns:
+    rename_dict['PoseBusters_Score'] = 'PoseBusters (%)'
+if 'Lipinski_RO5' in df_display.columns:
+    rename_dict['Lipinski_RO5'] = 'Lipinski RO5'
+
+df_display = df_display.rename(columns=rename_dict)
 
 # Configure AgGrid
 gb = GridOptionsBuilder.from_dataframe(df_display)
@@ -155,6 +255,10 @@ gb.configure_column("Ligand", width=120)
 gb.configure_column("Target (kcal/mol)", width=150, type=["numericColumn", "numberColumnFilter"])
 gb.configure_column("Specificity", width=120, type=["numericColumn", "numberColumnFilter"])
 gb.configure_column("Pocket Residues", width=400, wrapText=True, autoHeight=True)
+if 'PoseBusters (%)' in df_display.columns:
+    gb.configure_column("PoseBusters (%)", width=130, type=["numericColumn", "numberColumnFilter"])
+if 'Lipinski RO5' in df_display.columns:
+    gb.configure_column("Lipinski RO5", width=150)
 
 if 'Smiles' in df_display.columns:
     gb.configure_column("Smiles", hide=True)
@@ -197,6 +301,13 @@ if selected_rows is not None and len(selected_rows) > 0:
         
         if 'Smiles' in selected_row:
             st.markdown(f"**SMILES:** `{selected_row['Smiles']}`")
+        
+        # Add button to open in 3D Viewer
+        st.markdown("")
+        if st.button("Open in 3D Viewer", type="primary", key="open_3d_viewer"):
+            # Store the selected ligand in session state for py3Dmol to use
+            st.session_state.py3dmol_preselected_ligand = ligand_id
+            st.switch_page("pages/6_py3Dmol.py")
     
     with col2:
         if 'Smiles' in selected_row and selected_row['Smiles']:
