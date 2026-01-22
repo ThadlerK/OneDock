@@ -64,6 +64,10 @@ if 'affinity_cutoff' not in st.session_state:
     st.session_state.affinity_cutoff = -3.0
 if 'specificity_cutoff' not in st.session_state:
     st.session_state.specificity_cutoff = 0.0
+if 'posebusters_results' not in st.session_state:
+    st.session_state.posebusters_results = None
+if 'pb_selected_ligands' not in st.session_state:
+    st.session_state.pb_selected_ligands = None
 
 # --- CUSTOM CUTOFF FILTERS ---
 col1, col2 = st.columns(2)
@@ -110,7 +114,54 @@ if has_specificity:
 
 st.dataframe(selected_df[display_cols], height=250)
 
+# --- DISPLAY PREVIOUSLY SAVED RESULTS ---
+if st.session_state.posebusters_results is not None:
+    st.markdown("---")
+    st.subheader("Previously Calculated PoseBusters Results")
+    st.info("These results were saved from a previous validation and persist across page navigation")
+    
+    results_df = st.session_state.posebusters_results
+    
+    # Display summary statistics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        avg_score = results_df['quality_score'].mean() * 100
+        st.metric("Average Quality Score", f"{avg_score:.1f}%")
+    
+    with col2:
+        passed = (results_df['quality_score'] >= 0.8).sum()
+        st.metric("Poses Passed (>80%)", f"{passed}/{len(results_df)}")
+    
+    with col3:
+        failed = (results_df['quality_score'] < 0.7).sum()
+        st.metric("Poses Failed (<70%)", failed)
+    
+    with col4:
+        best_score = results_df['quality_score'].max() * 100
+        st.metric("Best Score", f"{best_score:.1f}%")
+    
+    # Display results table
+    display_df = results_df.copy()
+    display_df['quality_score'] = (display_df['quality_score'] * 100).round(1)
+    st.dataframe(display_df, height=300)
+    
+    # Download button
+    csv = results_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Stored PoseBusters Results",
+        data=csv,
+        file_name="stored_posebusters_results.csv",
+        mime="text/csv"
+    )
+    
+    if st.button("Clear Stored PoseBusters Results"):
+        st.session_state.posebusters_results = None
+        st.session_state.pb_selected_ligands = None
+        st.rerun()
+
 # Run PoseBusters
+st.markdown("---")
 if st.button("Run PoseBusters Validation", type="primary"):
     if not selected_ligands:
         st.error("Please select at least one ligand for validation")
@@ -156,6 +207,10 @@ if st.button("Run PoseBusters Validation", type="primary"):
         )
     
     if results_df is not None and not results_df.empty:
+        # Store in session state
+        st.session_state.posebusters_results = results_df
+        st.session_state.pb_selected_ligands = selected_ligands
+        
         # Display summary statistics
         st.subheader("Validation Summary")
         
