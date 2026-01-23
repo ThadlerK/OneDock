@@ -6,7 +6,7 @@ If you want to find out which ligands might bind to your protein, you have come 
 
 
 
-<table align = "center">
+<table align = "center" style = "border-collapse: collapse;">
   <tr>
     <td align = "center">
       <img src = "OneDock/app/images/specificity.svg" ><br>
@@ -18,6 +18,8 @@ If you want to find out which ligands might bind to your protein, you have come 
     </td>
     <td align = "center">
       <img src = "OneDock/app/images/protein_sequence.svg"><br>
+      <br>
+      <br>
       <sub>Work with Proteins without a defined Structure</sub>
     </td>
   </tr>
