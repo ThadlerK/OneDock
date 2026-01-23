@@ -6,23 +6,26 @@ If you want to find out which ligands might bind to your protein, you have come 
 
 
 
-<p align="center">
-  <figure style="display:inline-block; margin:20px; text-align:center;">
-    <img src = "OneDock/app/images/specificity.svg" height="150">
-    <figcaption><sub>Find the Ligands with the highest specificity for your Protein</sub></figcaption>
-  </figure>
-
-  <figure style="display:inline-block; margin:20px; text-align:center;">
-    <img src = "OneDock/app/images/unknown_sites.svg" height="150">
-    <figcaption><sub>Identify unknown binding sites</sub></figcaption>
-  </figure>
-
-  <figure style="display:inline-block; margin:20px; text-align:center;">
-    <img src = "OneDock/app/images/protein_sequence.svg" height="150">
-    <figcaption><sub>Work with Proteins without a defined Structure</sub></figcaption>
-  </figure>
-</p>
-
+<table align = "center" style = "border-collapse: collapse;">
+  <tr>
+    <td align = "center">
+      <img src = "OneDock/app/images/specificity.svg" ><br>
+      <sub>Find the Ligands with the highest specificity for your Protein</sub>
+    </td>
+    <td align = "center">
+      <img src = "OneDock/app/images/unknown_sites.svg"><br>
+      <sub>Identify unknown binding sites</sub>
+    </td>
+    <td align = "center">
+      <br>
+      <br>
+      <img src = "OneDock/app/images/protein_sequence.svg"><br>
+      <br>
+      <br>
+      <sub>Work with Proteins without a defined Structure</sub>
+    </td>
+  </tr>
+</table>
 
 
 
