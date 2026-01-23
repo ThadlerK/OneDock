@@ -27,8 +27,12 @@
   // -----------------------------
   // Workspace mounting
   // -----------------------------
+  // "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+  // "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces,type=bind,consistency=cached",
   "workspaceFolder": "/workspaces",
+
 
   "mounts": [
     "source=/home/shared,target=/home/shared,type=bind,consistency=cached"

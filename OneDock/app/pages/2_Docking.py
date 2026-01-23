@@ -6,6 +6,8 @@ import os
 import signal
 import time
 
+st.set_page_config(page_title = "Docking")
+
 # --- CONSTANTS ---
 PID_FILE = "docking.pid"
 LOG_FILE = "docking.log"

@@ -6,6 +6,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import run_posebusters_validation, convert_pdbqt_to_pdb
 
+st.set_page_config(page_title = "PoseBusters")
 st.title("PoseBusters Validation")
 st.markdown("### Quality Assessment of Docking Poses")
 

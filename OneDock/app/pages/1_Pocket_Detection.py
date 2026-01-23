@@ -13,6 +13,10 @@ from Bio.PDB import PDBParser
 from Bio.Data.IUPACData import protein_letters_3to1
 from utils import filter_P2Rank, P2Rank_to_PDB, pocket_comparison, run_fpocket, save_config, load_config
 
+st.set_page_config(
+    page_title = "Pocket detection",
+    page_icon = "app/images/logo_protein.png"
+)
 
 #set the session states
 if "pocket_unknown" not in st.session_state:
@@ -32,25 +36,27 @@ pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], i
 
 
 if pocket_status == "Known":
-    st.info("Pocket is known. Please define coordinates.")
-    target_residues = st.text_input("Pocket Residues of target receptor", placeholder="e.g., B:145,B:230")
+    st.info("Please define the coordinates of your pocket.")
+    col1, col2 = st.columns(2)
+    with col1:
+        target_residues = st.text_input("Pocket Residues of target receptor", placeholder="e.g., B:145,B:230")
 
-    if st.button("Save Target Config"):
-        # Save directly to config.yaml
-        save_config({
-            "pocket_residues": target_residues,
-            "grid_size": 20,
-            "exhaustiveness": 8
-        })
-
-    ref_path = load_config().get("ref_path")
-    if ref_path:
-        target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
-        if st.button("Save Reference Config"):
+        if st.button("Save Target Config"):
             # Save directly to config.yaml
             save_config({
-                "ref_residues": target_residues
+                "pocket_residues": target_residues,
+                "grid_size": 20,
+                "exhaustiveness": 8
             })
+    with col2:
+        ref_path = load_config().get("ref_path")
+        if ref_path:
+            target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
+            if st.button("Save Reference Config"):
+                # Save directly to config.yaml
+                save_config({
+                    "ref_residues": target_residues
+                })
 
 
     st.session_state.pocket_unknown = False
@@ -59,7 +65,6 @@ if pocket_status == "Known":
     
 
 else:
-    st.warning("Pocket is unknown. You need to run prediction.")
     save_config({"pocket_known": False})
     st.session_state.pocket_unknown = True
 
@@ -71,7 +76,7 @@ else:
 if st.session_state.pocket_unknown == True:
     #pdb_file = st.file_uploader(label = 'Upload your PBD file here',
      #                           type = 'pdb')
-    pdb_file_path = load_config().get("receptor_path")
+    pdb_file_path = load_config().get("target_path")
     with open(pdb_file_path, 'r') as f:
         pdb_file = f.read()
         
@@ -80,11 +85,29 @@ if st.session_state.pocket_unknown == True:
 
     st.write('Since you don\'t know the binding pocket of your protein, we will use two \
             different tools - fpocket and P2Rank - to predict potential binding pockets.')
-
+    st.write('If you have a reference structure, you will still have to define the pocket residues:')
+    ref_path = load_config().get("ref_path")
+    if ref_path:
+        target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
+        if st.button("Save Reference Config"):
+            # Save directly to config.yaml
+            save_config({
+                "ref_residues": target_residues
+            })
     ###########################################fpocket#############################################
 
     with st.container():
         st.subheader('fpocket prediction')
+        st.info("""
+                **fpocket** is a pocket detection tool  based on geometric methods such as Voronoi 
+                tessellation and α-spheres to identify surface cavities efficiently. 
+                It clusters these geometric features into pockets and scores them to estimate 
+                properties like druggability and pocket volume.\n
+                
+                Reference: Le Guilloux, V., Schmidtke, P., & Tuffery, P. (2009). 
+                Fpocket: an open source platform for ligand pocket detection. 
+                BMC bioinformatics, 10(1), 168.
+                """)
 
         ##parameters 
         st.write('Here, you can set the parameters for your fpocket prediction.')
@@ -152,7 +175,7 @@ if st.session_state.pocket_unknown == True:
                 st.session_state.fpocket_run = True #set session state
 
         #pocket visualization (appears when fpocket is done)
-        if st.session_state.fpocket_run == True:
+        if st.session_state.fpocket_run == True and any(Path("data/interim/pocket_detection/output_fpocket/filtered_pockets").glob("*.pdb")):
             col1, col2 = st.columns(2)
             with col1:
                 st.write('Visualize your pockets here:')
@@ -186,10 +209,23 @@ if st.session_state.pocket_unknown == True:
                         view.setStyle({"model": 1}, {"sphere": {"radius": 1.0, "color": "red"}})
                         view.zoomTo() #zooms to protein
                         showmol(view, height = 250, width = 400)
+        if st.session_state.fpocket_run == True and any(Path("data/interim/pocket_detection/output_fpocket/filtered_pockets").glob("*.pdb")) == False:
+            st.error('No pockets detected with these parameters. Please adjust them.')
 
     ###########################################P2Rank##############################################
     with st.container():
         st.subheader('P2Rank prediction')
+        st.info("""
+                **P2Rank** is a pocket detection tool that samples points on the protein’s 
+                solvent‑accessible surface and assigns each a ligandability score using 
+                a random forest model trained on known protein–ligand complexes. 
+                Points with high ligandability are clustered into pockets, which are then 
+                scored and ranked by combining the scores of their points.\n
+                
+                Krivák, R., & Hoksza, D. (2018). P2Rank: machine learning based tool for rapid 
+                and accurate prediction of ligand binding sites from protein structure. 
+                Journal of cheminformatics, 10(1), 39.
+                """)
         #inputs
         path_output_P2Rank = Path(output_path) / 'output_P2Rank'
 
@@ -242,7 +278,7 @@ if st.session_state.pocket_unknown == True:
                     )
                     st.session_state.P2Rank_run = True
 
-        if st.session_state.P2Rank_run == True:
+        if st.session_state.P2Rank_run == True and any(Path("data/interim/pocket_detection/output_P2Rank/filtered_pockets").glob("*.pdb")):
             #visualization
             col1, col2 = st.columns(2)
             with col1:
@@ -278,7 +314,9 @@ if st.session_state.pocket_unknown == True:
                         view.zoomTo() #zooms to protein
                         showmol(view, height = 250, width = 400)
     st.space("medium")
-
+    if st.session_state.P2Rank_run == True and any(Path("data/interim/pocket_detection/output_P2Rank/filtered_pockets").glob("*.pdb")) == False:
+        st.error('No pockets are detected with these parameters. Please adjust them.')
+        
     #########################################Method comparison######################################
     with st.container():
         st.divider() #layout
@@ -346,10 +384,10 @@ if st.session_state.pocket_unknown == True:
                                 
                                 try: #sicher gehen dass er nicht verkackt
                                     one_letter = protein_letters_3to1[resname.capitalize()]
-                                    residues.add(f'{one_letter}{resnum}')
+                                    residues.add(f'{resnum}')
                                 except KeyError:
                                     pass
                 st.write(','.join(sorted(residues)))
                 if st.button("save the residues for docking"):
-                    save_config({"pocket-residues": ','.join(sorted(residues))})
+                    save_config({"pocket_residues": ','.join(sorted(residues))})
                                 

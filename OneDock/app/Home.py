@@ -10,197 +10,121 @@ import subprocess
 from utils import reset_project
 import time
 
-st.set_page_config(page_title="OneDock Virtual Screening Pipeline", layout="wide")
+st.set_page_config(
+    page_title = "OneDock",
+    page_icon = "app/images/logo_protein.png"
+)
 
-# Ensure directories exist
-os.makedirs("data/inputs", exist_ok=True)
+st.image("app/images/logo_dunkel.png")
+st.markdown("<p style='text-align: center; font-weight: bold; font-size: 16px;'>The easiest way to find the most promising Ligands for your Protein</p>", 
+            unsafe_allow_html = True)
+st.space("small")
 
-
-st.title("Input & Visualization")
-st.sidebar.success("Current Step: Input")
-
-# --- A. RECEPTOR SELECTION ---
-st.subheader("A. Receptor Input")
-structure_known = st.radio("Is the PDB structure of the receptor known?", ["Yes", "No"])
-
-receptor_path = None
-
-if structure_known == "Yes":
-    save_config({"structure_known": True})
-    c1, c2 = st.columns(2)
-    with c1:
-        target_file = st.file_uploader("Upload Target Receptor (.pdb)", type="pdb")
-        #here we visualize the pdb file
-        if target_file is not None:
-            pdb_str = target_file.getvalue().decode("utf-8") #decodes bytes into string
-            view = py3Dmol.view(width=400, height= 200) #sets the room and its size
-            view.addModel(pdb_str, "pdb") #adds protein structure
-            view.setStyle({"cartoon": {"color": "spectrum"}})
-            view.zoomTo() #zooms to protein
-            showmol(view, height = 200, width = 400)
-    with c2:
-        ref_file = st.file_uploader("Upload Reference Receptor (Optional)", type="pdb")
-        #here we visualize the pdb file
-        if ref_file is not None:
-            pdb_str = ref_file.getvalue().decode("utf-8") #decodes bytes into string
-            view = py3Dmol.view(width=400, height= 200) #sets the room and its size
-            view.addModel(pdb_str, "pdb") #adds protein structure
-            view.setStyle({"cartoon": {"color": "spectrum"}})
-            view.zoomTo() #zooms to protein
-            showmol(view, height = 200, width = 400)
-
-    # Save and prepare receptor
-    if target_file:
-        # Save to disk
-        target_path = os.path.join("data/inputs", "target.pdb")
-        with open(target_path, "wb") as f:
-            f.write(target_file.getbuffer())
-        
-        st.success(f"Saved: {target_path}")
-        save_config({"target_path": target_path})
-
-        if st.button("Run Receptor Preparation"):
-            with st.spinner("Running Python Preparation Script..."):
-                target_output_file = "data/interim/target_prep.pdbqt"
-                
-                cmd = ["snakemake", "--cores", "1", target_output_file, "--rerun-incomplete"]
-                process = subprocess.run(cmd, capture_output=True, text=True)
-                
-                if process.returncode == 0:
-                    st.success("Preparation complete!")
-                    # Visualization logic here...
-                else:
-                    st.error("Preparation failed.")
-                    st.code(process.stderr)
-
-    # save and prepare reference
-    if ref_file:
-        # Save to disk
-        ref_path = os.path.join("data/inputs", "reference.pdb")
-        with open(ref_path, "wb") as f:
-            f.write(ref_file.getbuffer())
-        
-        st.success(f"Saved: {ref_path}")
-        save_config({"ref_path": ref_path})
-
-        if st.button("Run Reference Preparation"):
-            with st.spinner("Running Python Preparation Script..."):
-                target_output_file = "data/interim/reference_prep.pdbqt"
-                
-                cmd = ["snakemake", "--cores", "1", target_output_file, "--rerun-incomplete"]
-                process = subprocess.run(cmd, capture_output=True, text=True)
-                
-                if process.returncode == 0:
-                    st.success("Preparation complete!")
-                else:
-                    st.error("Preparation failed.")
-                    st.code(process.stderr)
-
-else:
-    st.info("Structure Unknown. Generate structures with Bioemu")
-    save_config({"structure_known": False})
-    uploaded_fasta = st.file_uploader("Upload Target FASTA", type=["fasta"])
-    if uploaded_fasta:
-        with open("data/inputs/target.fasta", "wb") as f:
-            f.write(uploaded_fasta.getbuffer())
-        if st.button(" Run BioEmu Prediction"):
-            target_output_pdb = "data/inputs/bioemu_target.pdb"
-            with st.spinner("BioEmu is generating structures... this may take a minute..."):
-                cmd = [
-                    "snakemake", 
-                    target_output_pdb,
-                    "--cores", "1", 
-                    "--configfile", "config/config.yaml",
-                    "--rerun-incomplete"
-                ]
-
-                process = subprocess.run(cmd, capture_output=True, text=True)
-                if process.returncode == 0:
-                    st.success("Structure generation complete!")
-                    save_config({"receptor_path": target_output_pdb})
-                else:
-                    st.error("BioEmu generation failed.")
-                    with st.expander("See Error Log"):
-                        st.code(process.stderr)
+st.write("Welcome to your protein-ligand matchmaker! \n" \
+         "If you want to find out which ligands might bind to your protein, \n" \
+        "you have come to the right place. \n" \
+        "OneDock can be applied in multiple ways:")
 
 
-# --- B. LIGAND LIBRARY ---
-os.makedirs("data/inputs/library_split", exist_ok=True)
+st.space("medium")
+col1, col2, col3, col4, col5, col6, col7 = st.columns ([1,3,2,3,1,3,1])
+with col2:
+    st.image("app/images/specificity.svg")
+with col4:
+    st.image("app/images/unknown_sites.svg")
+with col6:
+    st.space("medium")
+    st.image("app/images/protein_sequence.svg")
+    st.space("medium")
 
-st.markdown("---")
-st.subheader("B. Ligand Library")
-smiles_file = st.file_uploader("Upload Ligand Library (.smi / .csv)", type=["smi", "csv"])
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.write("<p style = 'color: #AB7FE1; text-align: center;'>Find the Ligands with the highest specificity for your Protein</p>", 
+             unsafe_allow_html = True)
 
-if smiles_file:
-   # 1. Read the file
-    content = smiles_file.getvalue().decode("utf-8")
-    lines = content.splitlines() 
-    lines = [line.strip() for line in lines if line.strip()]
+with col2:
+    st.write("<p style = 'color: #AB7FE1; text-align: center;'>Identify unknown binding sites</p>",
+             unsafe_allow_html = True)
+
+
+with col3:
+    st.write("<p style = 'color: #AB7FE1; text-align: center;'>Work with Proteins without a defined Structure</p>",
+             unsafe_allow_html = True)
+
+st.space('large')
+
+st.write('To do this you will be guided through the following pipeline:')
+
+st.image('app/images/pipeline.png')
+
+st.space('large')
+
+st.write('Once you have completed the pipeline OneDock will provide you with \n' \
+         'extensive Details about your ligands:')
+
+col1, col2, col3, col4, col5, col6, col7 = st.columns([0.5, 3, 1.5, 3, 1.5, 3, 1])
+
+#example visualization of pockets
+with col2:
+    with open("app/images/example_protein.pdb", "r") as f:
+        exemp_protein = f.read()
+    with open("app/images/example_pocket.pdb", "r") as f:
+        exemp_pocket = f.read()
+    view = py3Dmol.view(width=200, height= 200) #sets the room and its size
+    view.addModel(exemp_protein, "pdb") #adds protein structure
+    view.addModel(exemp_pocket, "pdb") #adds pocket structure
+    view.setStyle({"model": 0}, {"cartoon": {"color": "#AB7FE1"}})
+    view.setStyle({"model": 1}, {"sphere": {"radius": 1.0, "color": "#53C982"}})
+    view.zoomTo() #zooms to protein
+    showmol(view, height = 200, width = 200)
+
+#example visualization of ligand
+with col4:
+    st.space("medium")
+    st.image("app/images/example_compund.png")
+
+#parameter selection
+with col6:
+    st.space("small")
+    st.select_slider('ADME',
+                     options=list(range(0,10)),
+                     value = 4)
+    st.select_slider('Lipinsky Rule of Five',
+                     options = list(range(0, 10)),
+                     value = 7)
+
+
+
+col1, col2, col3, col4, col5, col6, col7 = st.columns([0.5, 3, 1.5, 3, 1.5, 3, 1])
+with col2:
+    st.write("<p style = 'color: #AB7FE1; text-align: center;'>Pocket locations and residues</p>", 
+             unsafe_allow_html = True)
+
+with col4:
+    st.write("<p style = 'color: #AB7FE1; text-align: center;'>list of most promising Ligands</p>", 
+             unsafe_allow_html = True)
     
-    st.info(f"Found {len(lines)} ligands. Splitting files...")
-    
-    # 2. Split into individual files
-    for i, line in enumerate(lines):
-        smi = line.split()[0]
-        fname = f"lig_{i:05d}.smi"
-        fpath = os.path.join("data/inputs/library_split", fname)
-        
-        with open(fpath, "w") as f:
-            f.write(smi)
-            
-    st.success(f"✅ Successfully created {len(lines)} input files in 'data/inputs/library_split/'")
+with col6:
+    st.write("<p style = 'color: #AB7FE1; text-align: center;" \
+             "'>Choose the best criteria for the final selection</p>",
+             unsafe_allow_html = True)
 
-    if st.button("Run Ligand Preparation"):
-        with st.spinner("Converting all ligands to PDBQT..."):
+st.space("medium")
+col1, col2, col3 = st.columns([1.5, 1, 1.5])
+with col2:
+    if st.button("Start the Docking Pipeline"):
+        st.switch_page("pages/0_Input_page.py")
 
-            target_rule = "prepare_all_ligands"
-            
-            # We pass the rule name directly to snakemake
-            cmd = ["snakemake", "--cores", "1", target_rule]
-            
-            process = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if process.returncode == 0:
-                st.success("All ligands converted successfully!")
-            else:
-                st.error("Ligand Preparation failed.")
-                with st.expander("Error Log"):
-                    st.code(process.stderr)
+st.space("large")
 
-
-# --- NAVIGATION ---
-st.markdown("---")
-if st.button("Go to Pocket Definition step"):
-    st.switch_page("pages/1_Pocket_Detection.py")
-
-st.sidebar.markdown("---")
-
-# Initialize session state for the confirmation button
-if "confirm_reset" not in st.session_state:
-    st.session_state.confirm_reset = False
-
-def on_reset_click():
-    st.session_state.confirm_reset = True
-
-def on_confirm_click():
-    status = reset_project()
-    if status == "Success":
-        st.toast("Project reset successfully!", icon="🗑️")
-        time.sleep(1)
-        st.rerun() # Refresh the app to clear inputs from memory
-    else:
-        st.error(status)
-    st.session_state.confirm_reset = False
-
-# The Logic
-if not st.session_state.confirm_reset:
-    st.sidebar.button("🗑️ Reset All Data", on_click=on_reset_click, type="primary")
-else:
-    st.sidebar.warning("Are you sure? This will delete all inputs and results.")
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        st.button("Yes, Delete", on_click=on_confirm_click, type="primary")
-    with col2:
-        if st.button("Cancel"):
-            st.session_state.confirm_reset = False
-            st.rerun()
+st.markdown(
+    """
+    <p style="color: grey; text-align: center;">
+        OneDock was created by Thaddeus Kühn, Tine Limberg, Manon Mandernach 
+        and Sylviane Verschaeve as part of the Meet-EU project of 2025/26.
+        For more information
+        <a href="https://github.com/meet-eu-25-26/Heidelberg_Team_2" target="_blank">check out our GitHub page</a>.
+    </p>
+    """,
+    unsafe_allow_html=True
+)
