@@ -36,25 +36,27 @@ pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], i
 
 
 if pocket_status == "Known":
-    st.info("Pocket is known. Please define coordinates.")
-    target_residues = st.text_input("Pocket Residues of target receptor", placeholder="e.g., B:145,B:230")
+    st.info("Please define the coordinates of your pocket.")
+    col1, col2 = st.columns(2)
+    with col1:
+        target_residues = st.text_input("Pocket Residues of target receptor", placeholder="e.g., B:145,B:230")
 
-    if st.button("Save Target Config"):
-        # Save directly to config.yaml
-        save_config({
-            "pocket_residues": target_residues,
-            "grid_size": 20,
-            "exhaustiveness": 8
-        })
-
-    ref_path = load_config().get("ref_path")
-    if ref_path:
-        target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
-        if st.button("Save Reference Config"):
+        if st.button("Save Target Config"):
             # Save directly to config.yaml
             save_config({
-                "ref_residues": target_residues
+                "pocket_residues": target_residues,
+                "grid_size": 20,
+                "exhaustiveness": 8
             })
+    with col2:
+        ref_path = load_config().get("ref_path")
+        if ref_path:
+            target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
+            if st.button("Save Reference Config"):
+                # Save directly to config.yaml
+                save_config({
+                    "ref_residues": target_residues
+                })
 
 
     st.session_state.pocket_unknown = False
@@ -63,7 +65,6 @@ if pocket_status == "Known":
     
 
 else:
-    st.warning("Pocket is unknown. You need to run prediction.")
     save_config({"pocket_known": False})
     st.session_state.pocket_unknown = True
 
@@ -84,7 +85,15 @@ if st.session_state.pocket_unknown == True:
 
     st.write('Since you don\'t know the binding pocket of your protein, we will use two \
             different tools - fpocket and P2Rank - to predict potential binding pockets.')
-
+    st.write('If you have a reference structure, you will still have to define the pocket residues:')
+    ref_path = load_config().get("ref_path")
+    if ref_path:
+        target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
+        if st.button("Save Reference Config"):
+            # Save directly to config.yaml
+            save_config({
+                "ref_residues": target_residues
+            })
     ###########################################fpocket#############################################
 
     with st.container():
@@ -166,7 +175,7 @@ if st.session_state.pocket_unknown == True:
                 st.session_state.fpocket_run = True #set session state
 
         #pocket visualization (appears when fpocket is done)
-        if st.session_state.fpocket_run == True:
+        if st.session_state.fpocket_run == True and any(Path("data/interim/pocket_detection/output_fpocket/filtered_pockets").glob("*.pdb")):
             col1, col2 = st.columns(2)
             with col1:
                 st.write('Visualize your pockets here:')
@@ -200,6 +209,8 @@ if st.session_state.pocket_unknown == True:
                         view.setStyle({"model": 1}, {"sphere": {"radius": 1.0, "color": "red"}})
                         view.zoomTo() #zooms to protein
                         showmol(view, height = 250, width = 400)
+        if st.session_state.fpocket_run == True and any(Path("data/interim/pocket_detection/output_fpocket/filtered_pockets").glob("*.pdb")) == False:
+            st.error('No pockets detected with these parameters. Please adjust them.')
 
     ###########################################P2Rank##############################################
     with st.container():
@@ -267,7 +278,7 @@ if st.session_state.pocket_unknown == True:
                     )
                     st.session_state.P2Rank_run = True
 
-        if st.session_state.P2Rank_run == True:
+        if st.session_state.P2Rank_run == True and any(Path("data/interim/pocket_detection/output_P2Rank/filtered_pockets").glob("*.pdb")):
             #visualization
             col1, col2 = st.columns(2)
             with col1:
@@ -303,7 +314,9 @@ if st.session_state.pocket_unknown == True:
                         view.zoomTo() #zooms to protein
                         showmol(view, height = 250, width = 400)
     st.space("medium")
-
+    if st.session_state.P2Rank_run == True and any(Path("data/interim/pocket_detection/output_P2Rank/filtered_pockets").glob("*.pdb")) == False:
+        st.error('No pockets are detected with these parameters. Please adjust them.')
+        
     #########################################Method comparison######################################
     with st.container():
         st.divider() #layout

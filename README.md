@@ -119,26 +119,71 @@ streamlit run app/Home.py
 ```
 OneDock will guide you through the steps according to your wishes. 
 
-## The Tools
+### The Tools
 
-### Streamlit
+#### **Streamlit**
 <p align = "center">
 <img src = "images_readme/streamlit-logo.png" width="20%"></p>
 
 We are using [streamlit](https://streamlit.io/) to build OneDock. It is a tool that helps you create an interactive app that allows you to set parameters for computation and visualize your results in different ways. This way OneDock is as user-friendly as possible, to provide you with the best experience possible!
 
-### Snakemake 
+#### **Snakemake** 
 <p align = "center">
 <img src = "images_readme/snakemake.jpg" width = "30%"></p>
 
 The pipeline is organized in [snakemake](https://snakemake.github.io/). It allows us to create a workflow system in which files are processed by functions (so called rules) while considering their dependencies. This way, we get a safe and reproducible workflow that is easily integrateable from python. 
 
-### Docker
+#### **Docker**
 <p align = "center">
 <img src = "images_readme/docker.png" width="15%"></p> 
 
 We use a [docker](https://www.docker.com/) container to bundle all the dependencies of OneDock. All of the different libraries, system tools,... necessary to run it are defined in a dockerfile from which an image is built. This way, when you use the pipleine, you won't have to worry about installing everything. 
 
+#### **fpocket**
+fpocket is a pocket detection tool  based on geometric methods such as Voronoi tessellation and α-spheres to identify surface cavities efficiently. It clusters these geometric features into pockets and scores them to estimate properties like druggability and pocket volume.
+
+#### **P2Rank**
+P2Rank is a pocket detection tool that samples points on the protein’s solvent‑accessible surface and assigns each a ligandability score using a random forest model trained on known protein–ligand complexes. Points with high ligandability are clustered into pockets, which are then  scored and ranked by combining the scores of their points.
+
+#### **Auto Dock Vina**
+AutoDock Vina is a fast molecular docking tool that predicts binding poses and binding affinities of small molecules to protein targets. It explores a user-defined binding site, generates multiple ligand poses, and scores them using an empirical scoring function.
+
+#### **SwissADME**
+SwissADME is a web-based tool that uses a variety of predictive models to compute physicochemical descriptors of small molecules from their structure. Thereby it predicts ADME properties, drug-likeness, pharmacokinetics and medicinal chemistry features.
+
+#### **PoseBusters**
+PoseBusters is a Python toolkit that validates the physical and chemical plausibility of protein-ligand complexes.
+
+#### **py3Dmol** 
+py3Dmol is a python toolkit that enables an interactive 3D visualization of protein-ligand complexes.
+
+
+
+
+                          
+
+
+
+### References
+Le Guilloux, V., Schmidtke, P., & Tuffery, P. (2009). Fpocket: an open source platform for ligand pocket detection. BMC bioinformatics, 10(1), 168.
+
+Krivák, R., & Hoksza, D. (2018). P2Rank: machine learning based tool for rapid and accurate prediction of ligand binding sites from protein structure. Journal of cheminformatics, 10(1), 39. 
+
+Trott, O., & Olson, A. J. (2010). AutoDock Vina: improving the speed and accuracy of docking with a new scoring function, efficient optimization, and multithreading. Journal of computational chemistry, 31(2), 455-46
+
+Daina, A., Michielin, O., & Zoete, V. (2017). SwissADME: a free web tool to evaluate pharmacokinetics, drug-likeness and medicinal chemistry friendliness of small molecules. Scientific reports, 7(1), 42717.
+
+Reference: Buttenschoen, M., Morris, G.M. & Deane, C.M. 
+PoseBusters: AI-based docking methods fail to generate physically valid poses or generalise to novel sequences. 
+Chem. Sci. 15, 3130-3139 (2024)
+
+Reference: Rego, N. and Koes, D. 3Dmol.js: molecular visualization with WebGL. 
+Bioinformatics 31, 1322-1324 (2015)
+
+
+
+
+<br>
 <br>
 <br>
 

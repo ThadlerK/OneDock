@@ -148,7 +148,7 @@ if smiles_file:
         with open(fpath, "w") as f:
             f.write(smi)
             
-    st.success(f"✅ Successfully created {len(lines)} input files in 'data/inputs/library_split/'")
+    st.success(f"Successfully created {len(lines)} input files in 'data/inputs/library_split/'")
 
     if st.button("Run Ligand Preparation"):
         with st.spinner("Converting all ligands to PDBQT..."):
