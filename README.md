@@ -19,6 +19,7 @@ If you want to find out which ligands might bind to your protein, you have come 
     <td align = "center">
       <br>
       <br>
+      <br>
       <img src = "OneDock/app/images/protein_sequence.svg"><br>
       <br>
       <br>
