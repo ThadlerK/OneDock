@@ -7,6 +7,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import create_py3dmol_visualization, convert_pdbqt_to_pdb, analyze_protein_ligand_interactions
 
+st.set_page_config(page_title = "py3Dmol")
 st.title("3D Molecular Visualization")
 st.markdown("### Interactive Structure Viewer with py3Dmol")
 

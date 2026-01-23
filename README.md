@@ -1,101 +1,41 @@
-for the final read me, scroll below the github stuff
-
-
-
-# Git Workflow Guide: Heidelberg_Team_2
-
-Dieser Guide beschreibt unseren Standard-Prozess für die Arbeit mit Git. Bitte halte dich an diese Schritte, um Konflikte zu vermeiden.
-
----
-
-## 1. Eigene Arbeit speichern (Täglicher Rhythmus)
-Sobald du an deinen Dateien gearbeitet hast und den Stand sichern willst:
-
-1.  **In den Projektordner wechseln:**
-    ```bash
-    cd Heidelberg_Team_2
-    ```
-
-2.  **Auf deinen persönlichen Branch wechseln:**
-    *(Ersetze `dein-branch-name` mit deinem tatsächlichen Branch)*
-    ```bash
-    git checkout dein-branch-name
-    ```
-
-3.  **Änderungen vorbereiten (Stagen) & Speichern (Commit):**
-    ```bash
-    git add .
-    git commit -m "Beschreibe kurz was du gemacht hast"
-    ```
-
-4.  **Hochladen (Push):**
-    ```bash
-    git push origin dein-branch-name
-    ```
-
----
-
-## 2. Deinen Branch aktuell halten (Updates vom Main holen)
-Bevor du weiterarbeitest (oder bevor du einen Pull Request machst), solltest du die Änderungen der anderen in deinen Branch holen.
-
-1.  **Wissen über Online-Änderungen holen (ohne Mischen):**
-    ```bash
-    git fetch origin
-    ```
-
-2.  **Den Main in deinen Branch mischen:**
-    *(Stelle sicher, dass du auf deinem Branch bist)*
-    ```bash
-    git merge origin/main
-    ```
-
-3.  **Falls Konflikte auftreten (VS Code meldet "Merge Conflict"):**
-    * Öffne die betroffenen Dateien (in VS Code rot markiert).
-    * Entscheide dich bei den markierten Blöcken (Dein Code vs. Incoming Code).
-    * Speichere die Datei(en).
-    * Führe den Merge-Commit aus:
-        ```bash
-        git add .
-        git commit -m "Konflikte mit Main gelöst"
-        ```
-
----
-
-## 3. Arbeit abschließen (Merge in Main)
-Wenn dein Feature fertig ist und für alle im Team verfügbar sein soll.
-
-### Option A: Über GitHub (Empfohlen)
-1.  Gehe auf die GitHub-Seite des Repositories.
-2.  Erstelle einen **Pull Request** (`dein-branch` ➡️ `main`).
-3.  Klicke auf **Merge**.
-
-### Option B: Manuell über das Terminal
-*(Nur nutzen, wenn Option A nicht möglich ist)*
-
-```bash
-# 1. Zum Main wechseln
-git checkout main
-
-# 2. Main aktualisieren
-git pull origin main
-
-# 3. Deinen Branch hineinholen
-git merge dein-branch-name
-
-# 4. Ergebnis hochladen
-git push origin main
-
-```
-
-# OneDock - How to find the best Ligand for your Protein 
+![Alt text](OneDock/app/images/logo_dunkel.png)
+<p align = "center"><strong>The easiest way to find the most promising Ligands for your Protein</strong></p>
 
 Welcome to your protein-ligand matchmaker!
-If you want to find out which ligands might bind to your protein, you have come to the right place. Onedock provides you with a variety of possibilities to screen your library of small molecules for the best candidates for your protein of interest. You have no idea where your binding pocket is? No problem! There is another protein that might bind the same ligands? Don't worry, we'll find the ones that are specific for your protein ;)
+If you want to find out which ligands might bind to your protein, you have come to the right place. Onedock provides you with a variety of possibilities to screen your library of small molecules for the best candidates for your protein of interest. You have no idea where your binding pocket is? No problem! There is another protein that might bind the same ligands? Don't worry, we'll find the ones that are specific for your protein.
+
+
+
+<table align = "center">
+  <tr>
+    <td align = "center">
+      <img src = "OneDock/app/images/specificity.svg" ><br>
+    </td>
+    <td align = "center">
+      <img src = "OneDock/app/images/unknown_sites.svg"><br>
+    </td>
+    <td align = "center">
+      <img src = "OneDock/app/images/protein_sequence.svg"><br>
+  </tr>
+</table>
+
+<table align = "center">
+  <tr>
+    <td align = "center">
+      <sub>Find the Ligands with the highest specificity for your Protein</sub>
+    </td>
+    <td align = "center">
+      <sub>Identify unknown binding sites</sub>
+    </td>
+    <td align = "center">
+      <sub>Work with Proteins without a defined Structure</sub>
+  </tr>
+</table>
 
 This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline. 
 
 ## How to find your way through the Pipeline 
-![Alt text](images_readme/pipeline.png)
+![Alt text](OneDock/app/images/pipeline.png)
 
 As you can see, there are a lot of different possibilities, so let's walk through them. 
 
@@ -121,7 +61,7 @@ As you can see, there are a lot of different possibilities, so let's walk throug
 On the docking page, you will use AutoDock vina to dock the ligands to the (pre)defined pocket. It will give out the best ligand candidates which you can filter on the ranking site using ADME and the lipinsky rule of five. 
 
 In the end you will be provided with your pocket residues, your final ligand candidates and their respective filtering scores. Additionally, OneDock will visualize the Ligans candidates and how they bind the protein. 
-BBy looking at the different scores you can then identify the Ligand that fits your requirements best. 
+By looking at the different scores you can then identify the Ligand that fits your requirements best. 
 
 <details>
   <summary> What about other proteins that can bind my Ligands?</summary>
@@ -141,6 +81,7 @@ OneDock
 ├── app/
 │   ├── .streamlit/         # streamlit layout
 │   │   └── config.toml
+│   ├── images/             #images needed for the app
 │   ├── pages/              # streamlit pages
 │   │   ├── 1_Structure_Preparation.py
 │   │   ├── 2_Pocket_Prediction.py
@@ -154,7 +95,7 @@ OneDock
 ├── data/
 │   ├── inputs/              # Input files
 │   ├── interim/             # Interim files 
-│   └── results/             # Output files generated by Snakemake
+│   └── results/             # Output files 
 ├── workflow/
 │   ├── scripts/              
 │   │   ├── bioemu_pipeline.py
@@ -163,27 +104,40 @@ OneDock
 │   └── Snakefile            # Main entry point for Snakemake
 └── .gitignore
 README.md
-images_readme
-└── pipeline.png             # Python dependencies
+images_readme/              
+
 ```
 
+### How to use OneDock
+For the ideal use of OneDock install [VS Code](https://code.visualstudio.com/download) and [docker](https://www.docker.com/). You can then clone the repository:
 
+```bash
+git clone https://github.com/meet-eu-25-26/Heidelberg_Team_2.git
+```
+Open the OneDock folder in VS code and choose *Dev Containers: Rebuild and Reopen in Container*.
+Once you are in your container you can start OneDock:
+```bash
+streamlit run app/Home.py
+```
+OneDock will guide you through the steps according to your wishes. 
 
-### The Website 
+## The Tools
+
+### Streamlit
 <p align = "center">
-<img src = "images_readme/streamlit-logo.png" width="30%"></p>
+<img src = "images_readme/streamlit-logo.png" width="25%"></p>
 
 We are using [streamlit](https://streamlit.io/) to build OneDock. It is a tool that helps you create an interactive app that allows you to set parameters for computation and visualize your results in different ways. This way OneDock is as user-friendly as possible, to provide you with the best experience possible!
 
 ### Snakemake 
 <p align = "center">
-<img src = "images_readme/snakemake.jpg" width = "70%"></p>
+<img src = "images_readme/snakemake.jpg" width = "30%"></p>
 
 The pipeline is organized in [snakemake](https://snakemake.github.io/). It allows us to create a workflow system in which files are processed by functions (so called rules) while considering their dependencies. This way, we get a safe and reproducible workflow that is easily integrateable from python. 
 
 ### Docker
 <p align = "center">
-<img src = "images_readme/docker.png" width="20.5%"></p> 
+<img src = "images_readme/docker.png" width="15%"></p> 
 
 We use a [docker](https://www.docker.com/) container to bundle all the dependencies of OneDock. All of the different libraries, system tools,... necessary to run it are defined in a dockerfile from which an image is built. This way, when you use the pipleine, you won't have to worry about installing everything. 
 

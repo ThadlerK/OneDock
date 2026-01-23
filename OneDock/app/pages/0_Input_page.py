@@ -10,7 +10,7 @@ import subprocess
 from utils import reset_project
 import time
 
-st.set_page_config(page_title="OneDock Virtual Screening Pipeline", layout="wide")
+st.set_page_config(page_title="Input", layout="wide")
 
 # Ensure directories exist
 os.makedirs("data/inputs", exist_ok=True)

@@ -7,7 +7,7 @@ from io import StringIO
 
 st.title("ADME Screening")
 st.markdown("")
-
+st.set_page_config(page_title = "ADME Screening")
 # Ensure output directory exists
 os.makedirs("data/results/output", exist_ok=True)
 
