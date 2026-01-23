@@ -10,27 +10,20 @@ If you want to find out which ligands might bind to your protein, you have come 
   <tr>
     <td align = "center">
       <img src = "OneDock/app/images/specificity.svg" ><br>
-    </td>
-    <td align = "center">
-      <img src = "OneDock/app/images/unknown_sites.svg"><br>
-    </td>
-    <td align = "center">
-      <img src = "OneDock/app/images/protein_sequence.svg"><br>
-  </tr>
-</table>
-
-<table align = "center">
-  <tr>
-    <td align = "center">
       <sub>Find the Ligands with the highest specificity for your Protein</sub>
     </td>
     <td align = "center">
+      <img src = "OneDock/app/images/unknown_sites.svg"><br>
       <sub>Identify unknown binding sites</sub>
     </td>
     <td align = "center">
+      <img src = "OneDock/app/images/protein_sequence.svg"><br>
       <sub>Work with Proteins without a defined Structure</sub>
+    </td>
   </tr>
 </table>
+
+
 
 This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline. 
 
@@ -125,7 +118,7 @@ OneDock will guide you through the steps according to your wishes.
 
 ### Streamlit
 <p align = "center">
-<img src = "images_readme/streamlit-logo.png" width="25%"></p>
+<img src = "images_readme/streamlit-logo.png" width="20%"></p>
 
 We are using [streamlit](https://streamlit.io/) to build OneDock. It is a tool that helps you create an interactive app that allows you to set parameters for computation and visualize your results in different ways. This way OneDock is as user-friendly as possible, to provide you with the best experience possible!
 
