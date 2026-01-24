@@ -134,13 +134,3 @@ cat > "$WORK_DIR/mmpbsa.in" <<EOF
   igb=5, saltcon=0.15,
 /
 EOF
-
-MMPBSA.py -O -i "$WORK_DIR/mmpbsa.in" \
-   -cp "$WORK_DIR/complex.prmtop" \
-   -rp "$WORK_DIR/receptor.prmtop" \
-   -lp "$WORK_DIR/ligand.prmtop" \
-   -y "$WORK_DIR/prod.nc" \
-   -o "$FINAL_DAT" \
-   >> "$LOG_FILE" 2>&1
-
-echo "[Success] Done." >> "$LOG_FILE"
