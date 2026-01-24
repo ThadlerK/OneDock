@@ -13,6 +13,8 @@ from Bio.PDB import PDBParser
 from Bio.Data.IUPACData import protein_letters_3to1
 from utils import filter_P2Rank, P2Rank_to_PDB, pocket_comparison, run_fpocket, save_config, load_config
 
+# pocket_residues: 21,22,23,24,25,26,27,102,250,251,252,253,256,406,410
+# ref_residues: 48,49,50,51,52,53,54,129,277,278,279,280,283,431,435
 
 #set the session states
 if "pocket_unknown" not in st.session_state:

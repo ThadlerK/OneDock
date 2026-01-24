@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     openjdk-17-jre-headless \
     patch \
+    ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 
 # 2. Install AutoDock Vina and P2Rank
 RUN wget https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64 \
@@ -24,16 +24,17 @@ RUN wget https://github.com/rdk/p2rank/releases/download/2.5.1/p2rank_2.5.1.tar.
     ln -sf /opt/p2rank_2.5.1/prank /usr/bin/p2rank && \
     rm -rf /tmp/p2rank.tar.gz
 
+# 3. Install Libmamba Solver explicitly
+RUN conda install -n base -c conda-forge conda-libmamba-solver -y && \
+    conda config --set solver libmamba
 
-# 3. Make conda non-interactive and up-to-date + Libmamba for faster loading
-RUN conda update -n base -c defaults -y conda && \
-    conda install -n base -c conda-forge conda-libmamba-solver && \
-    conda config --set solver libmamba && \
-    conda config --set always_yes yes --set changeps1 no
-
-# 4. Create the Conda environment
-RUN conda create -n adtools -c conda-forge -c bioconda \
+# 4. Create the Conda environment (FORCE libmamba here)
+# We group the pip installs here to keep the layer size smaller
+RUN conda create -n adtools -c conda-forge -c bioconda --solver=libmamba -y \
     python=3.10 \
+    cuda-version=11.8 \
+    ambertools=23 \
+    openmmforcefields \
     meeko \
     rdkit \
     numpy \
@@ -45,18 +46,20 @@ RUN conda create -n adtools -c conda-forge -c bioconda \
     seaborn \
     matplotlib \
     fpocket \
-    biobb_structure_utils \
+    biobb_common=5.1.0 \
+    biobb_structure_utils=5.1.0 \
     snakemake \
     streamlit \
     streamlit-aggrid \
     biopython \
     openmm \
     pdbfixer \
-    cudatoolkit \ 
-    pip
+    pip \
+    && conda clean -afy
 
-# 5. Install pip packages
-RUN /opt/conda/envs/adtools/bin/pip install \
+# 5. Install pip packages (Activating environment via run shell)
+SHELL ["/bin/bash", "-c"]
+RUN source activate adtools && pip install \
     biobb_vs \
     py3Dmol \
     ipython_genutils \
@@ -65,18 +68,20 @@ RUN /opt/conda/envs/adtools/bin/pip install \
     torch \
     posebusters
 
-# 6. Clean conda caches (IMPORTANT)
-RUN conda clean -afy
-
-# 7. Activate adtools by default
+# 6. Setup Environment Variables
 ENV PATH="/opt/conda/envs/adtools/bin:$PATH"
+ENV AMBERHOME="/opt/conda/envs/adtools"
+
+# Fix for VS Code Git Issue
+RUN git config --global --add safe.directory '*'
+
 # Fix for VS Code Terminal
 RUN echo "source activate adtools" >> ~/.bashrc 
 
-# 8. Setup app
+# 7. Setup app
 WORKDIR /app
 COPY . .
 
-# 9. Final config
+# 8. Final config
 EXPOSE 8501
 CMD ["streamlit", "run", "app/Home.py", "--server.port=8501", "--server.address=0.0.0.0"]

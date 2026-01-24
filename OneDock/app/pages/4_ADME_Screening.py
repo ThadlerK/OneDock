@@ -367,4 +367,4 @@ else:
 col1, col2 = st.columns(2)
 with col1:
     if st.button("← Back to Results"):
-        st.switch_page("pages/3_Results.py")
+        st.switch_page("pages/3_Docking_Results.py")
