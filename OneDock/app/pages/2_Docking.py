@@ -13,7 +13,17 @@ PID_FILE = "docking.pid"
 LOG_FILE = "docking.log"
 STATUS_FILE = "docking_status.txt" # "running", "success", "failed"
 
-st.title("Run Docking")
+st.title("Docking with AutoDock Vina")
+st.info("""
+        **AutoDock Vina** is a fast molecular docking tool that predicts binding poses and 
+        binding affinities of small molecules to protein targets. It explores a user-defined 
+        binding site, generates multiple ligand poses, and scores them using an empirical 
+        scoring function. \n
+
+        Reference: Trott, O., & Olson, A. J. (2010). AutoDock Vina: improving the speed and accuracy 
+        of docking with a new scoring function, efficient optimization, and multithreading. 
+        Journal of computational chemistry, 31(2), 455-46
+        """)
 
 # --- HELPER FUNCTIONS ---
 
