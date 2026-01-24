@@ -1,0 +1,199 @@
+# Snakefile
+
+configfile: "config/config.yaml"
+
+# Get ligand IDs from the split library
+LIGAND_IDS, = glob_wildcards("data/inputs/library_split/{id}.smi")
+
+# Define what to run: always target, optionally reference
+DOCKING_TARGETS = ["target"]
+if config.get("ref_path"):
+    DOCKING_TARGETS.append("reference")
+
+# --- Python Helper Functions ---
+
+def get_structure_input(wildcards):
+    """Decides which PDB file to use based on the type (target vs reference)."""
+    if wildcards.type == "target":
+        return config.get("target_path", "data/inputs/target.pdb")
+    elif wildcards.type == "reference":
+        return config.get("ref_path", "data/inputs/reference.pdb")
+    else:
+        raise ValueError(f"Unknown structure type: {wildcards.type}")
+
+def get_h_flag(wildcards):
+    """Decides if hydrogens (-h) need to be added via OpenBabel."""
+    # BioEmu (usually the target) already has hydrogens -> return empty string
+    if wildcards.type == "target" and not config.get("structure_known", True):
+        return ""
+    # Reference structures and standard uploads usually need hydrogens
+    return "-h"
+
+def get_docking_residues(wildcards):
+    """Returns the specific residues for target vs reference."""
+    if wildcards.type == "target":
+        return config.get("pocket_residues", "")
+    elif wildcards.type == "reference":
+        # Requires 'ref_residues' to be in your config.yaml
+        return config.get("ref_residues", "")
+    return ""
+
+# --- Rules ---
+
+rule all:
+    input:
+        expand("data/results/docking_report_{type}.csv", type=DOCKING_TARGETS)
+
+# Structure Preparation
+rule prepare_structure:
+    input:
+        pdb = get_structure_input
+    output:
+        pdbqt = "data/interim/{type}_prep.pdbqt"
+    params:
+        h_flag = get_h_flag
+    shell:
+        "obabel -ipdb {input.pdb} -opdbqt -O {output.pdbqt} -xr {params.h_flag} --partialcharge gasteiger 2> /dev/null"
+
+rule convert_ligand:
+    input:
+        smi = "data/inputs/library_split/{id}.smi"
+    output:
+        pdbqt = "data/interim/ligands/{id}.pdbqt"
+    script:
+        "scripts/convert_smi_to_pdbqt.py"
+
+rule prepare_all_ligands:
+    input:
+        expand("data/interim/ligands/{id}.pdbqt", id=LIGAND_IDS)
+
+# Docking
+rule run_docking:
+    input:
+        receptor = "data/interim/{type}_prep.pdbqt",
+        ligand   = "data/interim/ligands/{id}.pdbqt"
+    output:
+        docked  = "data/results/{type}/poses/{id}_docked.pdbqt",
+        log     = "data/results/{type}/logs/{id}.log",
+        summary = "data/results/{type}/stats/{id}.csv"
+    params:
+        residues = get_docking_residues,
+        exhaustiveness = config.get("exhaustiveness", 8),
+        grid_size = config.get("grid_size", 20)
+    shell:
+        """
+        bash workflow/scripts/docking_script_with_residues.sh \
+            "{input.receptor}" \
+            "{input.ligand}" \
+            "{params.residues}" \
+            "{output.docked}" \
+            "{output.log}" \
+            "{output.summary}" \
+            "{params.grid_size}" \
+            "{params.exhaustiveness}"
+        """
+
+# Aggregation per Type
+rule aggregate_results:
+    input:
+        # Double curly braces {{type}} allow the wildcard to pass through expand
+        expand("data/results/{{type}}/stats/{id}.csv", id=LIGAND_IDS)
+    output:
+        "data/results/docking_report_{type}.csv"
+    shell:
+        """
+        echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > {output}
+        # Concatenate all csvs, skipping the header line
+        tail -n +2 -q {input} >> {output}
+        """
+
+# --- BIOEMU STEP ---
+PYTHON_EXEC = "/opt/conda/envs/adtools/bin/python"
+
+rule run_bioemu_generation:
+    input:
+        fasta = "data/inputs/target.fasta"
+    output:
+        selected_pdb = "data/inputs/bioemu_target.pdb",
+        interim_dir = directory("data/interim/bioemu_workdir")
+    params:
+        samples = config.get("bioemu_samples", 10)
+    shell:
+        """
+        {PYTHON_EXEC} workflow/scripts/bioemu_pipeline.py \
+            --fasta {input.fasta} \
+            --working_dir {output.interim_dir} \
+            --output_pdb {output.selected_pdb} \
+            --samples {params.samples}
+        """
+
+# --- MMPBSA WORKFLOW ---
+
+# 1. Prepare Ligand Reference (Antechamber needs a mol2)
+rule prep_lig_reference:
+    input:
+        pdbqt = "data/results/target/poses/{id}_docked.pdbqt"
+    output:
+        mol2 = "data/interim/mmpbsa/{id}_ref.mol2"
+    conda:
+        "adtools"
+    shell:
+        # Extract Model 1 and convert to mol2
+        "obabel -ipdbqt {input.pdbqt} -omol2 -O {output.mol2} -f 1 -l 1 -h 2>/dev/null"
+
+# 2. Build Complex (Target + Ligand Rank X)
+rule build_complex_rank:
+    input:
+        target = "data/inputs/target.pdb", # Uses your raw input
+        ligand = "data/results/target/poses/{id}_docked.pdbqt"
+    output:
+        complex = "data/interim/mmpbsa/{id}_rank{rank}.pdb"
+    conda:
+        "adtools"
+    shell:
+        """
+        # 1. Convert specific rank to temporary PDB
+        obabel -ipdbqt {input.ligand} -opdb -O {output.complex}.tmp.pdb -f {wildcards.rank} -l {wildcards.rank} -h 2>/dev/null
+        
+        # 2. SANITIZE: Force Residue Name to 'LIG' and Chain to 'Z'
+        #    (We use double braces {{ }} for awk inside Snakemake)
+        awk 'BEGIN{{OFS=""}} /^ATOM|^HETATM/ {{ $0 = substr($0,1,17) "LIG" substr($0,21); $0 = substr($0,1,21) "Z" substr($0,23); print }}' {output.complex}.tmp.pdb > {output.complex}.lig.pdb
+        
+        # 3. Clean Protein (Keep only ATOM/HETATM)
+        grep -E '^(ATOM|HETATM)' {input.target} > {output.complex}.prot.pdb
+        
+        # 4. Merge
+        cat {output.complex}.prot.pdb {output.complex}.lig.pdb > {output.complex}
+        
+        # Cleanup
+        rm {output.complex}.tmp.pdb {output.complex}.lig.pdb {output.complex}.prot.pdb
+        """
+
+# 3. Run MD and MMPBSA (The Heavy Lifting)
+rule run_mmpbsa_calc:
+    input:
+        complex = "data/interim/mmpbsa/{id}_rank{rank}.pdb",
+        ref_mol2 = "data/interim/mmpbsa/{id}_ref.mol2"
+    output:
+        final_dat = "data/results/mmpbsa/{id}_rank{rank}/FINAL_RESULTS_MMPBSA.dat"
+    log:
+        log       = "data/results/mmpbsa/{id}_rank{rank}/mmpbsa.log"
+    params:
+        heat   = config.get("mmpbsa", {}).get("md_steps_heat", 20000),
+        eq     = config.get("mmpbsa", {}).get("md_steps_eq", 50000),
+        prod   = config.get("mmpbsa", {}).get("md_steps_prod", 200000),
+        stride = config.get("mmpbsa", {}).get("mmpbsa_stride", 2)
+    conda:
+        "adtools"
+    shell:
+        """
+        bash workflow/scripts/mmpbsa_worker.sh \
+            {input.complex} \
+            {input.ref_mol2} \
+            {output.final_dat} \
+            {log} \
+            {params.heat} \
+            {params.eq} \
+            {params.prod} \
+            {params.stride}
+        """
