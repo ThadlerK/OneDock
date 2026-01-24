@@ -6,6 +6,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import run_posebusters_validation, convert_pdbqt_to_pdb
 
+st.set_page_config(page_title = "PoseBusters")
 st.title("PoseBusters Validation")
 st.markdown("### Quality Assessment of Docking Poses")
 
@@ -38,33 +39,130 @@ if not os.path.exists(result_file):
 
 # Load docking results
 df = pd.read_csv(result_file)
+
+# Load reference results if available for specificity calculation
+ref_file = "data/results/docking_report_reference.csv"
+if os.path.exists(ref_file):
+    df_ref = pd.read_csv(ref_file)
+    
+    df = df.merge(
+        df_ref[['Ligand', 'Affinity_kcal_mol']],
+        on='Ligand',
+        how='left',
+        suffixes=('', '_ref')
+    )
+    df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
+    has_specificity = True
+else:
+    has_specificity = False
+
 df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
 st.subheader("PoseBusters Configuration")
 
-validation_mode = st.radio(
-    "Validation Mode:",
-    ["All poses", "Top N poses", "Manual selection"]
-)
+# --- INITIALIZE SESSION STATE ---
+if 'affinity_cutoff' not in st.session_state:
+    st.session_state.affinity_cutoff = -3.0
+if 'specificity_cutoff' not in st.session_state:
+    st.session_state.specificity_cutoff = 0.0
+if 'posebusters_results' not in st.session_state:
+    st.session_state.posebusters_results = None
+if 'pb_selected_ligands' not in st.session_state:
+    st.session_state.pb_selected_ligands = None
 
-# Selection logic
-selected_ligands = []
+# --- CUSTOM CUTOFF FILTERS ---
+col1, col2 = st.columns(2)
 
-if validation_mode == "Top N poses":
-    n_top = st.slider("Number of top poses to validate", min_value=1, max_value=min(50, len(df_sorted)), value=10)
-    selected_ligands = df_sorted.head(n_top)['Ligand'].tolist()
-
-elif validation_mode == "Manual selection":
-    selected_ligands = st.multiselect(
-        "Select ligands to validate:",
-        options=df_sorted['Ligand'].tolist(),
-        default=df_sorted.head(5)['Ligand'].tolist()
+with col1:
+    affinity_cutoff = st.number_input(
+        "Target Affinity ≤ (kcal/mol):",
+        value=st.session_state.affinity_cutoff,
+        step=0.5,
+        key='pb_affinity'
     )
+    st.session_state.affinity_cutoff = affinity_cutoff
 
-else:  # All poses
-    selected_ligands = df_sorted['Ligand'].tolist()
+with col2:
+    if has_specificity:
+        specificity_cutoff = st.number_input(
+            "Specificity ≤:",
+            value=st.session_state.specificity_cutoff,
+            step=0.5,
+            key='pb_specificity'
+        )
+        st.session_state.specificity_cutoff = specificity_cutoff
+    else:
+        st.info("No reference data - specificity filter not available")
+        specificity_cutoff = None
+
+# Apply filters
+if has_specificity and specificity_cutoff is not None:
+    selected_df = df_sorted[
+        (df_sorted['Affinity_kcal_mol'] <= affinity_cutoff) &
+        (df_sorted['Specificity'] <= specificity_cutoff)
+    ]
+else:
+    selected_df = df_sorted[
+        df_sorted['Affinity_kcal_mol'] <= affinity_cutoff
+    ]
+
+selected_ligands = selected_df['Ligand'].tolist()
+
+# Display selection
+display_cols = ['Ligand', 'Affinity_kcal_mol']
+if has_specificity:
+    display_cols.append('Specificity')
+
+st.dataframe(selected_df[display_cols], height=250)
+
+# --- DISPLAY PREVIOUSLY SAVED RESULTS ---
+if st.session_state.posebusters_results is not None:
+    st.markdown("---")
+    st.subheader("Previously Calculated PoseBusters Results")
+    st.info("These results were saved from a previous validation and persist across page navigation")
+    
+    results_df = st.session_state.posebusters_results
+    
+    # Display summary statistics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        avg_score = results_df['quality_score'].mean() * 100
+        st.metric("Average Quality Score", f"{avg_score:.1f}%")
+    
+    with col2:
+        passed = (results_df['quality_score'] >= 0.8).sum()
+        st.metric("Poses Passed (>80%)", f"{passed}/{len(results_df)}")
+    
+    with col3:
+        failed = (results_df['quality_score'] < 0.7).sum()
+        st.metric("Poses Failed (<70%)", failed)
+    
+    with col4:
+        best_score = results_df['quality_score'].max() * 100
+        st.metric("Best Score", f"{best_score:.1f}%")
+    
+    # Display results table
+    display_df = results_df.copy()
+    display_df['quality_score'] = (display_df['quality_score'] * 100).round(1)
+    st.dataframe(display_df, height=300)
+    
+    # Download button
+    csv = results_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Stored PoseBusters Results",
+        data=csv,
+        file_name="stored_posebusters_results.csv",
+        mime="text/csv"
+    )
+    
+    if st.button("Clear Stored PoseBusters Results"):
+        st.session_state.posebusters_results = None
+        st.session_state.pb_selected_ligands = None
+        st.rerun()
 
 # Run PoseBusters
+st.markdown("---")
 if st.button("Run PoseBusters Validation", type="primary"):
     if not selected_ligands:
         st.error("Please select at least one ligand for validation")
@@ -110,6 +208,10 @@ if st.button("Run PoseBusters Validation", type="primary"):
         )
     
     if results_df is not None and not results_df.empty:
+        # Store in session state
+        st.session_state.posebusters_results = results_df
+        st.session_state.pb_selected_ligands = selected_ligands
+        
         # Display summary statistics
         st.subheader("Validation Summary")
         
@@ -134,14 +236,18 @@ if st.button("Run PoseBusters Validation", type="primary"):
         # Display detailed results
         st.subheader("Detailed Results")
         
-        # Add color coding for quality scores
+        # Add color coding for quality scores and individual test results
         def color_quality_score(val):
-            if val >= 0.8:
+            if val >= 80:
                 return 'background-color: #90EE90'  # Light green
-            elif val >= 0.7:
+            elif val >= 70:
                 return 'background-color: #FFD700'  # Gold
             else:
                 return 'background-color: #FFB6C6'  # Light red
+        
+        def color_test_result(val):
+            """No coloring for test results"""
+            return ''  # No color
         
         # Format the dataframe and reorder columns
         display_df = results_df.copy()
@@ -152,11 +258,17 @@ if st.button("Run PoseBusters Validation", type="primary"):
         column_order = [
             'ligand_id',
             'quality_score',
+            'mol_pred_loaded',
+            'mol_cond_loaded',
+            'sanitization',
+            'inchi_convertible',
             'all_atoms_connected',
+            'no_radicals',
             'bond_lengths',
             'bond_angles',
             'internal_steric_clash',
             'aromatic_ring_flatness',
+            'non-aromatic_ring_non-flatness',
             'double_bond_flatness',
             'internal_energy',
             'minimum_distance_to_protein',
@@ -180,11 +292,17 @@ if st.button("Run PoseBusters Validation", type="primary"):
         column_descriptions = {
             'ligand_id': 'Ligand ID',
             'quality_score': 'Quality Score (%)',
+            'mol_pred_loaded': 'Mol Pred Loaded',
+            'mol_cond_loaded': 'Mol Cond Loaded',
+            'sanitization': 'Sanitization',
+            'inchi_convertible': 'InChI Convertible',
             'all_atoms_connected': 'All Atoms Connected',
+            'no_radicals': 'No Radicals',
             'bond_lengths': 'Bond Lengths Valid',
             'bond_angles': 'Bond Angles Valid',
             'internal_steric_clash': 'No Internal Clashes',
             'aromatic_ring_flatness': 'Aromatic Rings Flat',
+            'non-aromatic_ring_non-flatness': 'Non-Aromatic Ring Non-Flatness',
             'double_bond_flatness': 'Double Bonds Flat',
             'internal_energy': 'Internal Energy OK',
             'minimum_distance_to_protein': 'Min Distance to Protein',
@@ -202,12 +320,18 @@ if st.button("Run PoseBusters Validation", type="primary"):
         
         display_df = display_df.rename(columns=column_descriptions)
         
+        # Apply styling: quality score gets color based on score, test results get pass/fail colors
+        test_columns = [col for col in display_df.columns if col not in ['Ligand ID', 'Quality Score (%)', 'Passed Tests', 'Total Tests', 'Failed Tests Summary']]
+        
         styled_df = display_df.style.applymap(
             color_quality_score,
             subset=['Quality Score (%)']
+        ).applymap(
+            color_test_result,
+            subset=test_columns
         )
         
-        st.dataframe(styled_df, use_container_width=True)
+        st.dataframe(styled_df, use_container_width=True, height=400)
         
         # Show test descriptions
         with st.expander("Parameter Information"):
@@ -243,22 +367,7 @@ if st.button("Run PoseBusters Validation", type="primary"):
             **No Volume Overlap (Waters):** Checks for volumetric overlaps with waters.
             """)
         
-        # Show failed tests for problematic poses
-        st.subheader("Failed Tests by Pose")
-        
-        for _, row in results_df.iterrows():
-            if row['quality_score'] < 0.8:
-                with st.expander(f"{row['ligand_id']} - Quality Score: {row['quality_score']*100:.1f}%"):
-                    if 'failed_tests_summary' in row and row['failed_tests_summary'] and row['failed_tests_summary'] != 'None':
-                        st.write("Failed tests:")
-                        tests = row['failed_tests_summary'].split(', ')
-                        for test in tests:
-                            st.write(f"- {test}")
-                    else:
-                        st.write("All tests passed or no detailed information available")
-        
         # Download results
-        st.subheader("")
         csv = results_df.to_csv(index=False)
         st.download_button(
             label="Download PoseBusters Results (CSV)",
