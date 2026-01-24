@@ -173,11 +173,11 @@ if results_files:
             
     if data:
         df_res = pd.DataFrame(data).sort_values("Delta G (MMPBSA)")
-        st.dataframe(df_res, width=True)
+        st.dataframe(df_res, use_container_width=True)
         
         # Simple Download
         csv = df_res.to_csv(index=False).encode('utf-8')
-        st.download_button("Download CSV", csv, "mmpbsa_results.csv", "text/csv")
+        st.download_button("Download MMPBSA results as CSV", csv, "mmpbsa_results.csv", "text/csv")
     else:
         st.info("Parsing results found, but could not extract Delta G values yet.")
 else:
