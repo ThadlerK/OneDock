@@ -8,3 +8,7 @@ OneDock/log.out
 **/sandbox**
 OneDock/config/config.yaml
 **/docking.log
+**/_MMPBSA_*
+OneDock/leap.log
+OneDock/reference.frc
+**/logs

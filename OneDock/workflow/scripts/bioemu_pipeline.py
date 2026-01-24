@@ -17,7 +17,7 @@ AA1_TO_3 = {
     'R':'ARG','S':'SER','T':'THR','V':'VAL','W':'TRP','Y':'TYR'
 }
 
-def run_bioemu(fasta_path, output_dir, num_samples=100):
+def run_bioemu(fasta_path, output_dir, num_samples=10):
     """Executes the BioEmu sampling command."""
     print(f"🚀 Starting BioEmu sampling for {fasta_path}...")
     # --- GPU DIAGNOSTIC CHECK ---

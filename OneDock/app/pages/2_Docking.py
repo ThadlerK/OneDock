@@ -9,8 +9,8 @@ import time
 st.set_page_config(page_title = "Docking")
 
 # --- CONSTANTS ---
-PID_FILE = "docking.pid"
-LOG_FILE = "docking.log"
+PID_FILE = "logs/docking/docking.pid"
+LOG_FILE = "logs/docking/docking.log"
 STATUS_FILE = "docking_status.txt" # "running", "success", "failed"
 
 st.title("Run Docking")
@@ -62,7 +62,7 @@ if os.path.exists(PID_FILE) and not job_running:
     if "Finished job 0." in log_tail or "100%" in log_tail or "Nothing to be done" in log_tail:
         st.balloons()
         st.success(" Docking Job Completed while you were away!")
-        st.switch_page("pages/3_Results.py")
+        st.switch_page("pages/3_Docking_Results.py")
     else:
         st.error("The background job failed.")
         with st.expander("Error Log"):

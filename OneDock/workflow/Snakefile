@@ -126,3 +126,74 @@ rule run_bioemu_generation:
             --output_pdb {output.selected_pdb} \
             --samples {params.samples}
         """
+
+# --- MMPBSA WORKFLOW ---
+
+# 1. Prepare Ligand Reference (Antechamber needs a mol2)
+rule prep_lig_reference:
+    input:
+        pdbqt = "data/results/target/poses/{id}_docked.pdbqt"
+    output:
+        mol2 = "data/interim/mmpbsa/{id}_ref.mol2"
+    conda:
+        "adtools"
+    shell:
+        # Extract Model 1 and convert to mol2
+        "obabel -ipdbqt {input.pdbqt} -omol2 -O {output.mol2} -f 1 -l 1 -h 2>/dev/null"
+
+# 2. Build Complex (Target + Ligand Rank X)
+rule build_complex_rank:
+    input:
+        target = "data/inputs/target.pdb", # Uses your raw input
+        ligand = "data/results/target/poses/{id}_docked.pdbqt"
+    output:
+        complex = "data/interim/mmpbsa/{id}_rank{rank}.pdb"
+    conda:
+        "adtools"
+    shell:
+        """
+        # 1. Convert specific rank to temporary PDB
+        obabel -ipdbqt {input.ligand} -opdb -O {output.complex}.tmp.pdb -f {wildcards.rank} -l {wildcards.rank} -h 2>/dev/null
+        
+        # 2. SANITIZE: Force Residue Name to 'LIG' and Chain to 'Z'
+        #    (We use double braces {{ }} for awk inside Snakemake)
+        awk 'BEGIN{{OFS=""}} /^ATOM|^HETATM/ {{ $0 = substr($0,1,17) "LIG" substr($0,21); $0 = substr($0,1,21) "Z" substr($0,23); print }}' {output.complex}.tmp.pdb > {output.complex}.lig.pdb
+        
+        # 3. Clean Protein (Keep only ATOM/HETATM)
+        grep -E '^(ATOM|HETATM)' {input.target} > {output.complex}.prot.pdb
+        
+        # 4. Merge
+        cat {output.complex}.prot.pdb {output.complex}.lig.pdb > {output.complex}
+        
+        # Cleanup
+        rm {output.complex}.tmp.pdb {output.complex}.lig.pdb {output.complex}.prot.pdb
+        """
+
+# 3. Run MD and MMPBSA (The Heavy Lifting)
+rule run_mmpbsa_calc:
+    input:
+        complex = "data/interim/mmpbsa/{id}_rank{rank}.pdb",
+        ref_mol2 = "data/interim/mmpbsa/{id}_ref.mol2"
+    output:
+        final_dat = "data/results/mmpbsa/{id}_rank{rank}/FINAL_RESULTS_MMPBSA.dat"
+    log:
+        log       = "data/results/mmpbsa/{id}_rank{rank}/mmpbsa.log"
+    params:
+        heat   = config.get("mmpbsa", {}).get("md_steps_heat", 20000),
+        eq     = config.get("mmpbsa", {}).get("md_steps_eq", 50000),
+        prod   = config.get("mmpbsa", {}).get("md_steps_prod", 200000),
+        stride = config.get("mmpbsa", {}).get("mmpbsa_stride", 2)
+    conda:
+        "adtools"
+    shell:
+        """
+        bash workflow/scripts/mmpbsa_worker.sh \
+            {input.complex} \
+            {input.ref_mol2} \
+            {output.final_dat} \
+            {log} \
+            {params.heat} \
+            {params.eq} \
+            {params.prod} \
+            {params.stride}
+        """
