@@ -132,11 +132,44 @@ if job_running:
 # 3. DISPLAY LAUNCH BUTTON (INPUT MODE)
 else:
     st.subheader("Pipeline Execution")
+
+    input_dir = "data/inputs/library_split"
+    available_libs = set()
+    
+    if os.path.exists(input_dir):
+        files = os.listdir(input_dir)
+        for f in files:
+            if f.endswith(".smi"):
+                # Extract prefix (e.g. "Chembl" from "Chembl_0001.smi")
+                # We assume format is Name_Number.smi
+                match = re.match(r"(.+)_\d+\.smi", f)
+                if match:
+                    available_libs.add(match.group(1))
+    
+    # Sort and create dropdown
+    lib_list = sorted(list(available_libs))
+    
+    if not lib_list:
+        st.error("No ligand libraries found! Please go to Ligand Prep page.")
+        st.stop()
+        
+    # Get current selection from config if it exists
+    current_lib = lib_list[0]
+    if os.path.exists("config/config.yaml"):
+        with open("config/config.yaml") as f:
+            c = yaml.safe_load(f) or {}
+            if c.get("library_name") in lib_list:
+                current_lib = c.get("library_name")
+
+    selected_lib = st.selectbox(
+        "Select Ligand Library to Dock", 
+        lib_list, 
+        index=lib_list.index(current_lib)
+    )
+    
+    st.info(f"Selected library: **{selected_lib}**")
     
     # --- A. NEW: DOCKING SETTINGS ---
-    # Load current defaults if they exist
-    current_grid = 20
-    current_exhaust = 8
     
     if os.path.exists("config/config.yaml"):
         with open("config/config.yaml", "r") as f:
@@ -196,9 +229,9 @@ else:
         # --- B. Cleanup Old Results ---
         # Note: Be careful here. If you want to keep old results (different libraries),
         # you might want to skip this delete or make it more targeted.
-        if os.path.exists("data/results"):
-            shutil.rmtree("data/results")
-            os.makedirs("data/results", exist_ok=True)
+        # if os.path.exists("data/results"):
+        #     shutil.rmtree("data/results")
+        #     os.makedirs("data/results", exist_ok=True)
             
         # --- C. Launch Background Process ---
         with open(LOG_FILE, "w") as log:
