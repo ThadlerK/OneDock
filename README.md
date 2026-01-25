@@ -31,6 +31,7 @@ If you want to find out which ligands might bind to your protein, you have come 
 
 
 This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline. 
+<br
 
 ## How to find your way through the Pipeline 
 ![Alt text](OneDock/app/images/pipeline.png)
@@ -64,7 +65,7 @@ By looking at the different scores you can then identify the ligand that fits yo
     You can upload an additional reference strucuture on the upload page. OneDock will repeat the procedure for this protein and compare the docking results to the results of your protein of interest. This way you get the ligands that are specific for your protein. 
 </details><bp>
 
-
+<br>
 
 ## How is the code structured and how can I use it on my device?
 ### General structure
@@ -118,6 +119,7 @@ streamlit run app/Home.py
 OneDock will guide you through the steps according to your wishes. 
 You will need GPU access to use the BioEmu and MMPSA tools.
 
+<br>
 ### The Tools
 
 #### **Streamlit**
@@ -191,4 +193,5 @@ Bioinformatics 31, 1322-1324 (2015)
 <br>
 <br>
 
-OneDock was created by Thaddeus Kühn, Tine Limberg, Manon Mandernach and Sylviane Verschaeve as part of the Meet-EU project of 2025/26.
+OneDock was created by Thaddeus Kühn, Tine Limberg, Manon Mandernach and Sylviane Verschaeve as part of the Meet-EU project of 2025/26. <br>
+The project is protected under a MIT license.
