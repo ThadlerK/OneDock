@@ -135,6 +135,7 @@ cat > "$WORK_DIR/mmpbsa.in" <<EOF
 /
 EOF
 
+
 MMPBSA.py -O -i "$WORK_DIR/mmpbsa.in" \
    -cp "$WORK_DIR/complex.prmtop" \
    -rp "$WORK_DIR/receptor.prmtop" \

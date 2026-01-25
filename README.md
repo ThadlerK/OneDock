@@ -2,7 +2,7 @@
 <p align = "center"><strong>The easiest way to find the most promising Ligands for your Protein</strong></p>
 
 Welcome to your protein-ligand matchmaker!
-If you want to find out which ligands might bind to your protein, you have come to the right place. Onedock provides you with a variety of possibilities to screen your library of small molecules for the best candidates for your protein of interest. You have no idea where your binding pocket is? No problem! There is another protein that might bind the same ligands? Don't worry, we'll find the ones that are specific for your protein.
+If you want to find out which ligands might bind to your protein, you have come to the right place. OneDock provides you with a variety of possibilities to screen your library of small molecules for the best candidates for your protein of interest, even if you don't know the binding pockets of your protein or its experimental structure.
 
 
 
@@ -10,7 +10,7 @@ If you want to find out which ligands might bind to your protein, you have come 
   <tr>
     <td align = "center">
       <img src = "OneDock/app/images/specificity.svg" ><br>
-      <sub>Find the Ligands with the highest specificity for your Protein</sub>
+      <sub>Ligands with the highest <strong>specificity</strong> and <strong>selectivity</strong></sub>
     </td>
     <td align = "center">
       <img src = "OneDock/app/images/unknown_sites.svg"><br>
@@ -23,14 +23,14 @@ If you want to find out which ligands might bind to your protein, you have come 
       <img src = "OneDock/app/images/protein_sequence.svg"><br>
       <br>
       <br>
-      <sub>Work with Proteins without a defined Structure</sub>
+      <sub>Work with protein <strong>sequence data</strong></sub>
     </td>
   </tr>
 </table>
 
 
 
-This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline. 
+This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline.<br>
 
 ## How to find your way through the Pipeline 
 ![Alt text](OneDock/app/images/pipeline.png)
@@ -39,34 +39,30 @@ As you can see, there are a lot of different possibilities, so let's walk throug
 
  
 <details>
-  <summary> You allready know the protein structure and binding pocket</summary>
-    Good for you!
+  <summary> Scenario 1:You already know the protein structure and binding pocket</summary>
     If you allready know the protein binding region of your ligand candidate (e.g. a highly functional part of the protein) and only want ligands that bind to this pocket, you can just upload your protein and your ligand library on the first input page and directly proceed to docking. 
 </details><br>
 
 <details>
-  <summary> You don't know the binding pocket, but you know the protein structure</summary>
-    Great, this way you can try out our pocket detection page. There, you can predict the pockets using detection tools fpocket and P2Rank. Using filters (that you can set yourself) and by comparing the two methods, we'll compute the best pockets for you, so that you can proceed with docking. 
+  <summary> Scenario 2: You don't know the binding pocket, but you know the protein structure</summary>
+    Then you can try out our pocket detection page. There, you can predict the pockets using detection tools <em>fpocket</em> and <em>P2Rank</em>. Using filters (that you can set yourself) and by looking for overlaps between the two methods, we'll compute the best pockets for you, so that you can proceed with docking. 
 </details><br>
 
 <details>
-  <summary> I only have the sequence of my protein </summary>
-    So sad :( 
-    But don't worry, we'll use BioEmu to predict the structure and use the pocket detection page. There, you can predict the pockets using detection tools fpocket and P2Rank. Using filters (that you can set) and by comparing the two methods, we'll compute the best pockets for you, so that you can proceed with docking. 
+  <summary> Scenario 3: I only have the sequence of my protein </summary>
+    We'll use <em>BioEmu</em> to predict the structure and use the pocket detection page. There, you can predict the pockets using detection tools <em>fpocket</em> and <em>P2Rank</em>. Using filters (that you can set) and by looking for overlaps between the two methods, we'll compute the best pockets for you, so that you can proceed with docking. 
 </details><br>
 
 
-On the docking page, you will use AutoDock vina to dock the ligands to the (pre)defined pocket. It will give out the best ligand candidates which you can filter on the ranking site using ADME and the lipinsky rule of five. 
+On the docking page, you will use <em>AutoDock Vina</em> to dock the ligands to the (pre)defined pocket. It will give out the best ligand candidates which you can filter on the ranking site using <em>ADME</em> and <em>Lipinski's rule of five</em>. 
 
-In the end you will be provided with your pocket residues, your final ligand candidates and their respective filtering scores. Additionally, OneDock will visualize the Ligans candidates and how they bind the protein. 
-By looking at the different scores you can then identify the Ligand that fits your requirements best. 
+In the end you will be provided with your pocket residues, your final ligand candidates and their respective filtering scores. Additionally, OneDock will visualize the ligands candidates and how they bind the protein. 
+By looking at the different scores you can then identify the ligand that fits your requirements best. 
 
 <details>
-  <summary> What about other proteins that can bind my Ligands?</summary>
+  <summary> What about other targets?</summary>
     You can upload an additional reference strucuture on the upload page. OneDock will repeat the procedure for this protein and compare the docking results to the results of your protein of interest. This way you get the ligands that are specific for your protein. 
-</details><bp>
-**are we including the additional pockets in the predefined pocket situation?**
-
+</details><bp><br>
 
 ## How is the code structured and how can I use it on my device?
 ### General structure
@@ -86,7 +82,7 @@ OneDock
 │   │   ├── 3_Docking.py
 │   │   ├── 4_Results.py
 │   │   └── 5_ADME_Screening.py
-│   ├── Home.py              # Main Streamlit app
+│   ├── Home.py              # Main streamlit app
 │   └── utils.py             # Helper functions 
 ├── config/ 
 │   └── config.yaml          # Configuration for Snakemake
@@ -105,6 +101,7 @@ README.md
 images_readme/              
 
 ```
+<br>
 
 ### How to use OneDock
 For the ideal use of OneDock install [VS Code](https://code.visualstudio.com/download) and [docker](https://www.docker.com/). You can then clone the repository:
@@ -118,6 +115,7 @@ Once you are in your container you can start OneDock:
 streamlit run app/Home.py
 ```
 OneDock will guide you through the steps according to your wishes. 
+You will need GPU access to use the BioEmu and MMPSA tools.<br>
 
 ### The Tools
 
@@ -139,52 +137,58 @@ The pipeline is organized in [snakemake](https://snakemake.github.io/). It allow
 
 We use a [docker](https://www.docker.com/) container to bundle all the dependencies of OneDock. All of the different libraries, system tools,... necessary to run it are defined in a dockerfile from which an image is built. This way, when you use the pipleine, you won't have to worry about installing everything. 
 
+#### **BioEmu**
+
+
 #### **fpocket**
-fpocket is a pocket detection tool  based on geometric methods such as Voronoi tessellation and α-spheres to identify surface cavities efficiently. It clusters these geometric features into pockets and scores them to estimate properties like druggability and pocket volume.
+fpocket is a pocket detection tool  based on geometric methods such as Voronoi tessellation and α-spheres to identify surface cavities efficiently. It clusters these geometric features into pockets and scores them to estimate properties like druggability and pocket volume <sup>2</sup>.
 
 #### **P2Rank**
-P2Rank is a pocket detection tool that samples points on the protein’s solvent‑accessible surface and assigns each a ligandability score using a random forest model trained on known protein–ligand complexes. Points with high ligandability are clustered into pockets, which are then  scored and ranked by combining the scores of their points.
+P2Rank is a pocket detection tool that samples points on the protein’s solvent‑accessible surface and assigns each a ligandability score using a random forest model trained on known protein–ligand complexes. Points with high ligandability are clustered into pockets, which are then  scored and ranked by combining the scores of their points <sup>3</sup>.
 
-#### **Auto Dock Vina**
-AutoDock Vina is a fast molecular docking tool that predicts binding poses and binding affinities of small molecules to protein targets. It explores a user-defined binding site, generates multiple ligand poses, and scores them using an empirical scoring function.
+#### **AutoDock Vina**
+AutoDock Vina is a fast molecular docking tool that predicts binding poses and binding affinities of small molecules to protein targets. It explores a user-defined binding site, generates multiple ligand poses, and scores them using an empirical scoring function <sup>4</sup>.
 
 #### **SwissADME**
-SwissADME is a web-based tool that uses a variety of predictive models to compute physicochemical descriptors of small molecules from their structure. Thereby it predicts ADME properties, drug-likeness, pharmacokinetics and medicinal chemistry features.
+SwissADME is a web-based tool that uses a variety of predictive models to compute physicochemical descriptors of small molecules from their structure. Thereby it predicts ADME properties, drug-likeness, pharmacokinetics and medicinal chemistry features <sup>5</sup>.
 
 #### **PoseBusters**
-PoseBusters is a Python toolkit that validates the physical and chemical plausibility of protein-ligand complexes.
+PoseBusters is a Python toolkit that validates the physical and chemical plausibility of protein-ligand complexes <sup>6</sup>.
 
 #### **py3Dmol** 
-py3Dmol is a python toolkit that enables an interactive 3D visualization of protein-ligand complexes.
+py3Dmol is a python toolkit that enables an interactive 3D visualization of protein-ligand complexes <sup>6</sup>.
+
+#### **MMPBSA**
 
 
-
-
-                          
-
+<br>
+<br>
 
 
 ### References
-Le Guilloux, V., Schmidtke, P., & Tuffery, P. (2009). Fpocket: an open source platform for ligand pocket detection. BMC bioinformatics, 10(1), 168.
+1. *BioEmu Reference*
 
-Krivák, R., & Hoksza, D. (2018). P2Rank: machine learning based tool for rapid and accurate prediction of ligand binding sites from protein structure. Journal of cheminformatics, 10(1), 39. 
+2. Le Guilloux, V., Schmidtke, P., & Tuffery, P. (2009). Fpocket: an open source platform for ligand pocket detection. BMC bioinformatics, 10(1), 168.
 
-Trott, O., & Olson, A. J. (2010). AutoDock Vina: improving the speed and accuracy of docking with a new scoring function, efficient optimization, and multithreading. Journal of computational chemistry, 31(2), 455-46
+3. Krivák, R., & Hoksza, D. (2018). P2Rank: machine learning based tool for rapid and accurate prediction of ligand binding sites from protein structure. Journal of cheminformatics, 10(1), 39. 
 
-Daina, A., Michielin, O., & Zoete, V. (2017). SwissADME: a free web tool to evaluate pharmacokinetics, drug-likeness and medicinal chemistry friendliness of small molecules. Scientific reports, 7(1), 42717.
+4. Trott, O., & Olson, A. J. (2010). AutoDock Vina: improving the speed and accuracy of docking with a new scoring function, efficient optimization, and multithreading. Journal of computational chemistry, 31(2), 455-46
 
-Reference: Buttenschoen, M., Morris, G.M. & Deane, C.M. 
+5. Daina, A., Michielin, O., & Zoete, V. (2017). SwissADME: a free web tool to evaluate pharmacokinetics, drug-likeness and medicinal chemistry friendliness of small molecules. Scientific reports, 7(1), 42717.
+
+6. Buttenschoen, M., Morris, G.M. & Deane, C.M. 
 PoseBusters: AI-based docking methods fail to generate physically valid poses or generalise to novel sequences. 
 Chem. Sci. 15, 3130-3139 (2024)
 
-Reference: Rego, N. and Koes, D. 3Dmol.js: molecular visualization with WebGL. 
+7. Rego, N. and Koes, D. 3Dmol.js: molecular visualization with WebGL. 
 Bioinformatics 31, 1322-1324 (2015)
 
-
+8. *MMPBSA reference*
 
 
 <br>
 <br>
 <br>
 
-OneDock was created by Thaddeus Kühn, Tine Limberg, Manon Mandernach and Sylviane Verschaeve as part of the Meet-EU project of 2025/26.
+OneDock was created by Thaddeus Kühn, Tine Limberg, Manon Mandernach and Sylviane Verschaeve as part of the Meet-EU project of 2025/26. <br>
+The project is protected under a MIT license.

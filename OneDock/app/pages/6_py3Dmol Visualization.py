@@ -7,8 +7,8 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import create_py3dmol_visualization, convert_pdbqt_to_pdb, analyze_protein_ligand_interactions
 
-st.set_page_config(page_title = "py3Dmol")
-st.title("3D Molecular Visualization")
+st.set_page_config(page_title = "py3Dmol Visualization")
+st.title("3D Molecular Visualization with py3Dmol")
 st.markdown("### Interactive Structure Viewer with py3Dmol")
 
 # Display information about py3Dmol
@@ -27,7 +27,7 @@ receptor_file = "data/interim/target_prep.pdbqt"
 if not os.path.exists(result_file):
     st.warning("No docking results found. Please run the docking pipeline first.")
     if st.button("Go to Docking"):
-        st.switch_page("pages/3_Docking.py")
+        st.switch_page("pages/2_Docking.py")
     st.stop()
 
 # Load docking results

@@ -15,7 +15,17 @@ PID_FILE = "logs/docking/docking.pid"
 LOG_FILE = "logs/docking/docking.log"
 STATUS_FILE = "docking_status.txt" # "running", "success", "failed"
 
-st.title("Run Docking")
+st.title("Docking with AutoDock Vina")
+st.info("""
+        **AutoDock Vina** is a fast molecular docking tool that predicts binding poses and 
+        binding affinities of small molecules to protein targets. It explores a user-defined 
+        binding site, generates multiple ligand poses, and scores them using an empirical 
+        scoring function. \n
+
+        Reference: Trott, O., & Olson, A. J. (2010). AutoDock Vina: improving the speed and accuracy 
+        of docking with a new scoring function, efficient optimization, and multithreading. 
+        Journal of computational chemistry, 31(2), 455-46
+        """)
 
 # --- HELPER FUNCTIONS ---
 
@@ -62,8 +72,9 @@ if os.path.exists(PID_FILE) and not job_running:
     cleanup_job() # Reset for next run
     
     if "Finished job 0." in log_tail or "100%" in log_tail or "Nothing to be done" in log_tail:
-        st.success("Docking Job Completed while you were away!")
-        st.switch_page("pages/3_Docking_Results.py")
+        st.balloons()
+        st.success(" Docking Job Completed while you were away!")
+        st.switch_page("pages/3_Docking Results.py")
     else:
         st.error("The background job failed.")
         with st.expander("Error Log"):
