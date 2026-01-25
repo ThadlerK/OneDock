@@ -38,6 +38,8 @@ pocket_status = st.radio("Is the binding pocket known?", ["Known", "Unknown"], i
 
 
 if pocket_status == "Known":
+    save_config({"pocket_known": True})
+
     st.info("Please define the coordinates of your pocket.")
     col1, col2 = st.columns(2)
     with col1:

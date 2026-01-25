@@ -177,17 +177,19 @@ if not lig_job_running:
         # Get filename without extension (e.g. "My New Lib.smi" -> "My New Lib")
         raw_name = os.path.splitext(smiles_file.name)[0]
         # Replace spaces and weird chars with underscores -> "My_New_Lib"
-        safe_prefix = re.sub(r'[^a-zA-Z0-9]', '_', raw_name)
+        library_name = re.sub(r'[^a-zA-Z0-9]', '_', raw_name)
+
+        save_config({"library_name": library_name})
         
         # B. TARGETED CLEANUP
         # Delete only old files belonging to THIS library to prevent "ghost files"
         # e.g., Delete "My_New_Lib_00001.smi" but keep "Old_Lib_00001.smi"
-        old_files = glob.glob(f"data/inputs/library_split/{safe_prefix}_*.smi")
+        old_files = glob.glob(f"data/inputs/library_split/{library_name}_*.smi")
         for f in old_files:
             os.remove(f)
             
         if old_files:
-            st.info(f"Removed {len(old_files)} old files for library '{safe_prefix}'. Updating...")
+            st.info(f"Removed {len(old_files)} old files for library '{library_name}'. Updating...")
 
         # C. PROCESS CONTENT
         content = smiles_file.getvalue().decode("utf-8")
@@ -221,7 +223,7 @@ if not lig_job_running:
 
                 # --- SAVE WITH PREFIX ---
                 # Format: {LibraryName}_{Number}.smi
-                fname = f"{safe_prefix}_{valid_count:05d}.smi" 
+                fname = f"{library_name}_{valid_count:05d}.smi" 
                 fpath = os.path.join("data/inputs/library_split", fname)
                 
                 with open(fpath, "w") as f:
@@ -234,7 +236,7 @@ if not lig_job_running:
 
         progress_bar.empty()
         
-        st.success(f"Saved {valid_count} ligands as '{safe_prefix}_XXXXX.smi'")
+        st.success(f"Saved {valid_count} ligands as '{library_name}_XXXXX.smi'")
         
         if skipped_count > 0:
             st.warning(f"Excluded {skipped_count} ligands.")

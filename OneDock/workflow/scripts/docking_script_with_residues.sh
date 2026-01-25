@@ -9,6 +9,8 @@ OUTPUT_LOG="$5"
 OUTPUT_SUMMARY="$6"
 GRID_SIZE="${7:-20}"    # Default to 20 if not set
 EXHAUSTIVENESS="${8:-8}" # Default to 8 if not set
+POCKET_MODE="${9:-unknown}"      # e.g., "Manual" or "Automatic"
+STRUCTURE_MODE="${10:-unknown}"  # e.g., "Reference" or "Blind"
 
 echo "========================================"
 echo "STARTING SINGLE DOCKING RUN"
@@ -37,8 +39,8 @@ if [ ! -s "$LIGAND_PDBQT" ]; then
     LIG_NAME=$(basename "$LIGAND_PDBQT" .pdbqt)
     
     # Write header and a 'NaN' row
-    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > "$OUTPUT_SUMMARY"
-    echo "$REC_NAME,$LIG_NAME,NaN,skipped" >> "$OUTPUT_SUMMARY"
+    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles,Grid_Size,Exhaustiveness,Pocket_Mode,Structure_Mode" > "$OUTPUT_SUMMARY"
+    echo "$REC_NAME,$LIG_NAME,NaN,skipped,$GRID_SIZE,$EXHAUSTIVENESS,$POCKET_MODE,$STRUCTURE_MODE" >> "$OUTPUT_SUMMARY"
     
     # Exit cleanly so the pipeline continues
     exit 0
@@ -151,8 +153,8 @@ if [ -f "$OUTPUT_LOG" ]; then
         SMILES="unknown"
     fi
     
-    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > "$OUTPUT_SUMMARY"
-    echo "$REC_NAME,$LIG_NAME,$AFFINITY,$SMILES" >> "$OUTPUT_SUMMARY"
+    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles,Grid_Size,Exhaustiveness,Pocket_Mode,Structure_Mode" > "$OUTPUT_SUMMARY"
+    echo "$REC_NAME,$LIG_NAME,$AFFINITY,$SMILES,$GRID_SIZE,$EXHAUSTIVENESS,$POCKET_MODE,$STRUCTURE_MODE" >> "$OUTPUT_SUMMARY"
     
     echo "Docking Complete. Best Affinity: $AFFINITY"
 else
