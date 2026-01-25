@@ -30,7 +30,7 @@ If you want to find out which ligands might bind to your protein, you have come 
 
 
 
-This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline.<br
+This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline.<br>
 
 ## How to find your way through the Pipeline 
 ![Alt text](OneDock/app/images/pipeline.png)
@@ -101,6 +101,7 @@ README.md
 images_readme/              
 
 ```
+<br>
 
 ### How to use OneDock
 For the ideal use of OneDock install [VS Code](https://code.visualstudio.com/download) and [docker](https://www.docker.com/). You can then clone the repository:
