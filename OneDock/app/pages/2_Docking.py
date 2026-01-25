@@ -5,6 +5,8 @@ import shutil
 import os
 import signal
 import time
+import re
+from utils import save_config
 
 st.set_page_config(page_title = "Docking")
 
@@ -55,13 +57,12 @@ job_running = is_job_running()
 
 # If the job was running but the PID is gone now, it finished (success or fail)
 if os.path.exists(PID_FILE) and not job_running:
-    # Read the final log to guess status (or use Snakemake exit codes if we wrapped it)
+    # Read the final log to guess status
     log_tail = get_log_content()
     cleanup_job() # Reset for next run
     
     if "Finished job 0." in log_tail or "100%" in log_tail or "Nothing to be done" in log_tail:
-        st.balloons()
-        st.success(" Docking Job Completed while you were away!")
+        st.success("Docking Job Completed while you were away!")
         st.switch_page("pages/3_Docking_Results.py")
     else:
         st.error("The background job failed.")
@@ -73,9 +74,33 @@ if job_running:
     st.info("Docking pipeline is running in the background...")
     st.caption("You can close this tab or VS Code. The job will continue.")
     
-    # Auto-refresh the page every 10 seconds to check status
-    st.empty() # Placeholder
-    time.sleep(1) # Small delay
+    # --- NEW: PROGRESS BAR LOGIC ---
+    progress_val = 0
+    progress_text = "Initializing docking..."
+    
+    # We read the log to find the percentage
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "r") as f:
+            log_content = f.read()
+            # Regex: find all digits followed by '%' (e.g., 50%)
+            matches = re.findall(r"([\d\.]+)%", log_content)
+            
+            if matches:
+                # Take the last occurrence and convert to float
+                try:
+                    last_pct = float(matches[-1])
+                    progress_val = min(last_pct, 100.0)
+                    progress_text = f"Docking Progress: {progress_val:.1f}%"
+                except ValueError:
+                    pass
+    
+    # Render the bar
+    st.progress(progress_val / 100, text=progress_text)
+    # -------------------------------
+    
+    # Auto-refresh the page every 2 seconds
+    st.empty() 
+    time.sleep(2) 
     if st.button("Refresh Status"):
         st.rerun()
 
@@ -97,7 +122,46 @@ if job_running:
 else:
     st.subheader("Pipeline Execution")
     
+    # --- A. NEW: DOCKING SETTINGS ---
+    # Load current defaults if they exist
+    current_grid = 20
+    current_exhaust = 8
+    
+    if os.path.exists("config/config.yaml"):
+        with open("config/config.yaml", "r") as f:
+            existing_conf = yaml.safe_load(f) or {}
+            current_grid = existing_conf.get("grid_size", 20)
+            current_exhaust = existing_conf.get("exhaustiveness", 8)
+
+    with st.expander("Docking Parameters", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            # Box Size Input
+            grid_size = st.number_input(
+                "Box Size (Å)", 
+                min_value=10, 
+                max_value=30, 
+                value=int(current_grid),
+                help="Size of the cubic box centered on the pocket (default: 20Å)"
+            )
+        with col2:
+            # Exhaustiveness Input
+            exhaustiveness = st.number_input(
+                "Exhaustiveness", 
+                min_value=1, 
+                max_value=100, 
+                value=int(current_exhaust),
+                help="How hard Vina searches. Higher = slower but more accurate (default: 8)"
+            )
+            
+    # --------------------------------
+    
     if st.button("Launch Docking Pipeline"):
+        save_config({
+            "grid_size": grid_size,
+            "exhaustiveness": exhaustiveness
+        })
+
         # --- A. Validation ---
         try:
             with open("config/config.yaml", "r") as f:
@@ -119,33 +183,31 @@ else:
             st.stop()
 
         # --- B. Cleanup Old Results ---
+        # Note: Be careful here. If you want to keep old results (different libraries),
+        # you might want to skip this delete or make it more targeted.
         if os.path.exists("data/results"):
             shutil.rmtree("data/results")
             os.makedirs("data/results", exist_ok=True)
             
         # --- C. Launch Background Process ---
-        # We redirect stdout/stderr to a file so we can read it later
         with open(LOG_FILE, "w") as log:
-            # Construct the command
             cmd = [
                 "snakemake",
                 "--cores", "1",
                 "--configfile", "config/config.yaml",
                 "--rerun-incomplete",
-                "--keep-going" # Don't stop on first error
+                "--keep-going"
             ]
             
-            # Popen starts the process without waiting for it
             process = subprocess.Popen(
                 cmd,
                 stdout=log,
                 stderr=log,
-                start_new_session=True # CRITICAL: Detaches from the parent (Streamlit)
+                start_new_session=True 
             )
             
-            # Save the PID
             with open(PID_FILE, "w") as f:
                 f.write(str(process.pid))
                 
         st.success("Job started in background!")
-        st.rerun() # Reload page to switch to "Monitoring Mode"
+        st.rerun()

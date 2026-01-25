@@ -22,6 +22,28 @@ mkdir -p "$(dirname "$OUTPUT_DOCKED")"
 mkdir -p "$(dirname "$OUTPUT_LOG")"
 mkdir -p "$(dirname "$OUTPUT_SUMMARY")"
 
+# --- CHECK FOR EMPTY LIGAND (FAILED PREP) ---
+if [ ! -s "$LIGAND_PDBQT" ]; then
+    echo "Ligand file is empty (Preparation Failed). Skipping docking."
+    
+    # 1. Create a dummy docked file (empty) to satisfy Snakemake
+    touch "$OUTPUT_DOCKED"
+    
+    # 2. Create a dummy log explaining why
+    echo "Docking skipped due to empty ligand input." > "$OUTPUT_LOG"
+    
+    # 3. Create a placeholder summary so your results table doesn't break
+    REC_NAME=$(basename "$RECEPTOR_PDBQT" .pdbqt)
+    LIG_NAME=$(basename "$LIGAND_PDBQT" .pdbqt)
+    
+    # Write header and a 'NaN' row
+    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > "$OUTPUT_SUMMARY"
+    echo "$REC_NAME,$LIG_NAME,NaN,skipped" >> "$OUTPUT_SUMMARY"
+    
+    # Exit cleanly so the pipeline continues
+    exit 0
+fi
+
 # --- 1. CALCULATE POCKET CENTER FROM RESIDUES ---
 # We use a quick inline Python script to parse the PDBQT and find the center of mass of the selected residues.
 # This ensures the center is calculated exactly for the input file used.
