@@ -34,7 +34,7 @@ poses_dir = "data/results/target/poses"
 if not os.path.exists(result_file):
     st.warning("No docking results found. Please run the docking pipeline first.")
     if st.button("Go to Docking"):
-        st.switch_page("pages/3_Docking.py")
+        st.switch_page("pages/2_Docking.py")
     st.stop()
 
 # Load docking results

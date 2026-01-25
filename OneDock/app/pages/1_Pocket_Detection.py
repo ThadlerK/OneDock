@@ -41,7 +41,7 @@ if pocket_status == "Known":
     st.info("Please define the coordinates of your pocket.")
     col1, col2 = st.columns(2)
     with col1:
-        target_residues = st.text_input("Pocket Residues of target receptor", placeholder="e.g., B:145,B:230")
+        target_residues = st.text_input("Pocket Residues of target receptor", placeholder="e.g.,145,230")
 
         if st.button("Save Target Config"):
             # Save directly to config.yaml
@@ -53,7 +53,7 @@ if pocket_status == "Known":
     with col2:
         ref_path = load_config().get("ref_path")
         if ref_path:
-            target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
+            target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g.,145,230")
             if st.button("Save Reference Config"):
                 # Save directly to config.yaml
                 save_config({
@@ -90,7 +90,7 @@ if st.session_state.pocket_unknown == True:
     st.write('If you have a reference structure, you will still have to define the pocket residues:')
     ref_path = load_config().get("ref_path")
     if ref_path:
-        target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g., B:145,B:230")
+        target_residues = st.text_input("Pocket Residues of reference receptor", placeholder="e.g.,145,230")
         if st.button("Save Reference Config"):
             # Save directly to config.yaml
             save_config({
@@ -99,7 +99,7 @@ if st.session_state.pocket_unknown == True:
     ###########################################fpocket#############################################
 
     with st.container():
-        st.subheader('fpocket prediction')
+        st.subheader('fpocket Prediction')
         st.info("""
                 **fpocket** is a pocket detection tool  based on geometric methods such as Voronoi 
                 tessellation and α-spheres to identify surface cavities efficiently. 
@@ -216,7 +216,7 @@ if st.session_state.pocket_unknown == True:
 
     ###########################################P2Rank##############################################
     with st.container():
-        st.subheader('P2Rank prediction')
+        st.subheader('P2Rank Prediction')
         st.info("""
                 **P2Rank** is a pocket detection tool that samples points on the protein’s 
                 solvent‑accessible surface and assigns each a ligandability score using 
@@ -224,7 +224,7 @@ if st.session_state.pocket_unknown == True:
                 Points with high ligandability are clustered into pockets, which are then 
                 scored and ranked by combining the scores of their points.\n
                 
-                Krivák, R., & Hoksza, D. (2018). P2Rank: machine learning based tool for rapid 
+                Reference: Krivák, R., & Hoksza, D. (2018). P2Rank: machine learning based tool for rapid 
                 and accurate prediction of ligand binding sites from protein structure. 
                 Journal of cheminformatics, 10(1), 39.
                 """)
@@ -321,8 +321,9 @@ if st.session_state.pocket_unknown == True:
         
     #########################################Method comparison######################################
     with st.container():
-        st.divider() #layout
+        
         if st.session_state.fpocket_run == True and st.session_state.P2Rank_run == True:
+            st.divider() #layout
             st.write('Now that both pocket prediction methods have been run, \
                     you might wonder whether they predict the same pockets. \
                     Therefore, we will now compare the centers of the predicted pockets.')
@@ -334,7 +335,7 @@ if st.session_state.pocket_unknown == True:
                                             value = 6)
             with col2: 
                 if threshold <=6:
-                    st.success('only very similar pocket will be a match')
+                    st.success('only very similar pockets will be a match')
                 if threshold >6 and threshold <=12:
                     st.warning('moderately similar pockets might be a match')
                 if threshold >12:
