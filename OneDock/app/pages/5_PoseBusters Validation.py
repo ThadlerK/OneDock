@@ -43,11 +43,21 @@ if not os.path.exists(result_file):
 # Load docking results
 df = pd.read_csv(result_file)
 
-# Load reference results if available for specificity calculation
+# Load reference results if available for specificity and rank gain calculation
 ref_file = "data/results/docking_report_reference.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     
+    # Sort by affinity to assign ranks
+    df_target_sorted = df.sort_values('Affinity_kcal_mol').reset_index(drop=True)
+    df_target_sorted['Rank_Target'] = df_target_sorted.index + 1
+    
+    df_ref_sorted = df_ref.sort_values('Affinity_kcal_mol').reset_index(drop=True)
+    df_ref_sorted['Rank_Ref'] = df_ref_sorted.index + 1
+    
+    # Merge ranks and reference affinity
+    df = df.merge(df_target_sorted[['Ligand', 'Rank_Target']], on='Ligand', how='left')
+    df = df.merge(df_ref_sorted[['Ligand', 'Rank_Ref']], on='Ligand', how='left')
     df = df.merge(
         df_ref[['Ligand', 'Affinity_kcal_mol']],
         on='Ligand',
@@ -55,9 +65,12 @@ if os.path.exists(ref_file):
         suffixes=('', '_ref')
     )
     df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
+    df['Rank_Gain'] = df['Rank_Ref'] - df['Rank_Target']
     has_specificity = True
+    has_rank_gain = True
 else:
     has_specificity = False
+    has_rank_gain = False
 
 df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
@@ -74,40 +87,58 @@ if 'pb_selected_ligands' not in st.session_state:
     st.session_state.pb_selected_ligands = None
 
 # --- CUSTOM CUTOFF FILTERS ---
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     affinity_cutoff = st.number_input(
-        "Target Affinity ≤ (kcal/mol):",
+        "Max Target Affinity (kcal/mol):",
         value=st.session_state.affinity_cutoff,
         step=0.5,
-        key='pb_affinity'
+        key='pb_affinity',
+        help="Show only ligands with affinity ≤ this value."
     )
     st.session_state.affinity_cutoff = affinity_cutoff
 
 with col2:
     if has_specificity:
         specificity_cutoff = st.number_input(
-            "Specificity ≤:",
+            "Max Specificity:",
             value=st.session_state.specificity_cutoff,
             step=0.5,
-            key='pb_specificity'
+            key='pb_specificity',
+            help="Show only ligands with specificity ≤ this value."
         )
         st.session_state.specificity_cutoff = specificity_cutoff
     else:
-        st.info("No reference data - specificity filter not available")
+        st.warning("⚠️ No reference data - specificity filter not available")
         specificity_cutoff = None
 
+with col3:
+    if has_rank_gain:
+        min_rank_gain = int(df['Rank_Gain'].min())
+        max_rank_gain = int(df['Rank_Gain'].max())
+        rank_gain_cutoff = st.number_input(
+            "Min Rank Gain:",
+            min_value=min_rank_gain,
+            max_value=max_rank_gain,
+            value=st.session_state.get('rank_gain_cutoff', min_rank_gain),
+            step=1,
+            key='pb_rank_gain',
+            help="Show only ligands with rank gain ≥ this value."
+        )
+        st.session_state.rank_gain_cutoff = rank_gain_cutoff
+    else:
+        st.warning("⚠️ No reference data - rank gain filter not available")
+        rank_gain_cutoff = None
+
 # Apply filters
+selected_df = df_sorted[df_sorted['Affinity_kcal_mol'] <= affinity_cutoff]
+
 if has_specificity and specificity_cutoff is not None:
-    selected_df = df_sorted[
-        (df_sorted['Affinity_kcal_mol'] <= affinity_cutoff) &
-        (df_sorted['Specificity'] <= specificity_cutoff)
-    ]
-else:
-    selected_df = df_sorted[
-        df_sorted['Affinity_kcal_mol'] <= affinity_cutoff
-    ]
+    selected_df = selected_df[selected_df['Specificity'] <= specificity_cutoff]
+
+if has_rank_gain and rank_gain_cutoff is not None:
+    selected_df = selected_df[selected_df['Rank_Gain'] >= rank_gain_cutoff]
 
 selected_ligands = selected_df['Ligand'].tolist()
 
@@ -115,6 +146,8 @@ selected_ligands = selected_df['Ligand'].tolist()
 display_cols = ['Ligand', 'Affinity_kcal_mol']
 if has_specificity:
     display_cols.append('Specificity')
+if has_rank_gain:
+    display_cols.append('Rank_Gain')
 
 st.dataframe(selected_df[display_cols], height=250)
 
