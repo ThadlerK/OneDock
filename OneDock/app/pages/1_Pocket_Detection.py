@@ -1,3 +1,4 @@
+import shutil
 import streamlit as st
 import py3Dmol
 from stmol import showmol
@@ -162,6 +163,9 @@ if st.session_state.pocket_unknown == True:
 
         #run fpocket via skript
         if st.button('run fpocket'):
+            fpockets_path = Path(output_path) / 'output_fpocket' / 'filtered_pockets'
+            if fpockets_path.exists():
+                shutil.rmtree(fpockets_path)
             with st.spinner("fpocket is running..."):
                 run_fpocket(
                     pdb = pdb_file_path,
@@ -258,6 +262,9 @@ if st.session_state.pocket_unknown == True:
 
         #run P2Rank
         if st.button("run P2Rank"):
+            p2pockets_path = Path(output_path) / 'output_P2Rank' / 'filtered_pockets'
+            if p2pockets_path.exists():
+                shutil.rmtree(p2pockets_path)
             with st.spinner("P2Rank is running"):
                 path_output_P2Rank.mkdir(parents=True, exist_ok=True)
 
