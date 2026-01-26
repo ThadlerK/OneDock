@@ -362,36 +362,35 @@ if has_rank_gain and rank_gain_cutoff is not None:
     df = df[df['Rank_Gain'] >= rank_gain_cutoff]
 
 # Apply ADME filters
-if max_tpsa is not None and 'TPSA' in df.columns:
-    df = df[df['TPSA'] <= max_tpsa]
 
-if max_rotatable is not None and '#Rotatable bonds' in df.columns:
-    df = df[df['#Rotatable bonds'] <= max_rotatable]
+def filter_with_na(df, col, op, value):
+    if col not in df.columns:
+        return df
+    mask = df[col].isna() | op(df[col], value)
+    return df[mask]
 
-if max_aromatic is not None and '#Aromatic heavy atoms' in df.columns:
-    df = df[df['#Aromatic heavy atoms'] <= max_aromatic]
-
-if max_pains is not None and 'PAINS #alerts' in df.columns:
-    df = df[df['PAINS #alerts'] <= max_pains]
-
+import operator
+df = filter_with_na(df, 'TPSA', operator.le, max_tpsa)
+df = filter_with_na(df, '#Rotatable bonds', operator.le, max_rotatable)
+df = filter_with_na(df, '#Aromatic heavy atoms', operator.le, max_aromatic)
+df = filter_with_na(df, 'PAINS #alerts', operator.le, max_pains)
 if gi_filter != "All" and 'GI absorption' in df.columns:
-    df = df[df['GI absorption'] == gi_filter]
-
+    mask = df['GI absorption'].isna() | (df['GI absorption'] == gi_filter)
+    df = df[mask]
 if bbb_filter != "All" and 'BBB permeant' in df.columns:
-    df = df[df['BBB permeant'] == bbb_filter]
-
-if min_bioavail is not None and 'Bioavailability Score' in df.columns:
-    df = df[df['Bioavailability Score'] >= min_bioavail]
-
-if max_synth_access is not None and 'Synthetic accessibility' in df.columns:
-    df = df[df['Synthetic accessibility'] <= max_synth_access]
+    mask = df['BBB permeant'].isna() | (df['BBB permeant'] == bbb_filter)
+    df = df[mask]
+df = filter_with_na(df, 'Bioavailability Score', operator.ge, min_bioavail)
+df = filter_with_na(df, 'Synthetic accessibility', operator.le, max_synth_access)
 
 # Apply PoseBusters Score filter
 if min_posebusters is not None:
     if 'PoseBusters (%)' in df.columns:
-        df = df[df['PoseBusters (%)'].astype(float) >= min_posebusters]
+        mask = df['PoseBusters (%)'].isna() | (df['PoseBusters (%)'].astype(float) >= min_posebusters)
+        df = df[mask]
     elif 'PoseBusters_Score' in df.columns:
-        df = df[df['PoseBusters_Score'].astype(float) >= min_posebusters]
+        mask = df['PoseBusters_Score'].isna() | (df['PoseBusters_Score'].astype(float) >= min_posebusters)
+        df = df[mask]
 
 # Apply Lipinski filter
 if (('Lipinski RO5' in df.columns) or ('Lipinski_RO5' in df.columns)) and lipinski_filter != "All":
