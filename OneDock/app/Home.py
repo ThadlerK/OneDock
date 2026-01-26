@@ -50,7 +50,7 @@ st.space('medium')
 
 st.write('To do this you will be guided through the following pipeline:')
 
-st.image('app/images/pipeline.png')
+st.image('app/images/pipeline.svg')
 
 st.space('large')
 
