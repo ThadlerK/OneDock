@@ -147,12 +147,12 @@ We use a [docker](https://www.docker.com/) container to bundle all the dependenc
 
 #### **BioEmu**
 <p align = "center">
-<img src = "OneDock/app/images/bioemu.svg" width="15%"></p> 
+<img src = "OneDock/app/images/bioemu.svg" width="10%"></p> 
 BioEmu is a generative structural modeling approach used to  sample  biomolecular conformations. In this project, BioEmu was used only to generate the  initial protein structures. No dynamics or free energy calculations were performed with BioEmu; it served exclusively as a tool for initial structure sampling.
 
 #### **fpocket**
 <p align = "center">
-<img src = "OneDock/app/images/fpocket.svg" width="20%"></p> 
+<img src = "OneDock/app/images/fpocket.svg" width="15%"></p> 
 fpocket is a pocket detection tool  based on geometric methods such as Voronoi tessellation and α-spheres to identify surface cavities efficiently. It clusters these geometric features into pockets and scores them to estimate properties like druggability and pocket volume <sup>2</sup>.
 
 #### **P2Rank**
@@ -162,7 +162,7 @@ P2Rank is a pocket detection tool that samples points on the protein’s solvent
 
 #### **AutoDock Vina**
 <p align = "center">
-<img src = "OneDock/app/images/vina.svg" width="10%"></p> 
+<img src = "OneDock/app/images/vina.svg" width="7.5%"></p> 
 AutoDock Vina is a fast molecular docking tool that predicts binding poses and binding affinities of small molecules to protein targets. It explores a user-defined binding site, generates multiple ligand poses, and scores them using an empirical scoring function <sup>4</sup>.
 
 #### **SwissADME**
@@ -172,7 +172,7 @@ SwissADME is a web-based tool that uses a variety of predictive models to comput
 
 #### **PoseBusters**
 <p align = "center">
-<img src = "OneDock/app/images/posebusters.svg" width="10%"></p> 
+<img src = "OneDock/app/images/posebusters.svg" width="7.5%"></p> 
 PoseBusters is a Python toolkit that validates the physical and chemical plausibility of protein-ligand complexes <sup>7</sup>.
 
 #### **py3Dmol** 
