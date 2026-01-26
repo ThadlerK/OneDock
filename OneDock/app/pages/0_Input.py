@@ -104,7 +104,11 @@ else:
             Since you don't know the structure of your receptor, we will use Bio Emu to
             predict it.\n
 
-            **BioEmu** is a tool...
+            **BioEmu** BioEmu is a generative structural modeling approach used to sample biomolecular conformations. 
+            In this project, BioEmu was used only to generate the initial protein structures. No dynamics or free energy 
+            calculations were performed with BioEmu; it served exclusively as a tool for initial structure sampling. <br>
+            Reference: Lewis, S., Hempel, T., Jiménez-Luna, J., Gastegger, M., Xie, Y., Foong, A. Y., ... & Noé, F. (2025). 
+            Scalable emulation of protein equilibrium ensembles with generative deep learning. Science, 389(6761), eadv9817.
             """)
     save_config({"structure_known": False})
     uploaded_fasta = st.file_uploader("Upload Target FASTA", type=["fasta"])
