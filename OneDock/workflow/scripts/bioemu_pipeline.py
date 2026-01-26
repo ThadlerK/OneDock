@@ -19,15 +19,15 @@ AA1_TO_3 = {
 
 def run_bioemu(fasta_path, output_dir, num_samples=10):
     """Executes the BioEmu sampling command."""
-    print(f"🚀 Starting BioEmu sampling for {fasta_path}...")
+    print(f"Starting BioEmu sampling for {fasta_path}...")
     # --- GPU DIAGNOSTIC CHECK ---
     if torch.cuda.is_available():
         device_name = torch.cuda.get_device_name(0)
         device_count = torch.cuda.device_count()
-        print(f"✅ GPU DETECTED: {device_name} (Total GPUs: {device_count})")
-        print("🚀 BioEmu will run in FAST mode.")
+        print(f"GPU DETECTED: {device_name} (Total GPUs: {device_count})")
+        print("BioEmu will run in FAST mode.")
     else:
-        print("⚠️  NO GPU DETECTED. BioEmu will run in SLOW mode (CPU).")
+        print("NO GPU DETECTED. BioEmu will run in SLOW mode (CPU).")
         print("   If you expected a GPU, check your Docker run command (--gpus all).")
 
     cmd = [
@@ -40,20 +40,20 @@ def run_bioemu(fasta_path, output_dir, num_samples=10):
     # Run command and wait for it to finish
     try:
         subprocess.run(cmd, check=True)
-        print("✅ BioEmu sampling complete.")
+        print("BioEmu sampling complete.")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error running BioEmu: {e}")
+        print(f"Error running BioEmu: {e}")
         exit(1)
 
 def convert_npz_to_pdb(npz_dir, pdb_out_dir):
     """Converts BioEmu .npz files to CA-only PDB files."""
-    print(f"🔄 Converting NPZ to PDB in {pdb_out_dir}...")
+    print(f"Converting NPZ to PDB in {pdb_out_dir}...")
     os.makedirs(pdb_out_dir, exist_ok=True)
     
     npz_files = sorted([f for f in os.listdir(npz_dir) if f.startswith("batch_") and f.endswith(".npz")])
     
     if not npz_files:
-        print("⚠️ No .npz files found! Did BioEmu run correctly?")
+        print("No .npz files found! Did BioEmu run correctly?")
         return []
 
     generated_pdbs = []
@@ -92,26 +92,26 @@ def convert_npz_to_pdb(npz_dir, pdb_out_dir):
             generated_pdbs.append(pdb_path)
             counter += 1
             
-    print(f"✅ Converted {len(generated_pdbs)} PDB files.")
+    print(f"Converted {len(generated_pdbs)} PDB files.")
     return generated_pdbs
 
 def pick_random_structure(pdb_list, final_output_path):
     """Picks one random PDB from the list and copies it."""
     if not pdb_list:
-        print("❌ No PDBs available to select.")
+        print("No PDBs available to select.")
         return
 
     selected_pdb = random.choice(pdb_list)
-    print(f"🎲 Randomly selected: {os.path.basename(selected_pdb)}")
+    print(f"Randomly selected: {os.path.basename(selected_pdb)}")
     
     shutil.copy(selected_pdb, final_output_path)
-    print(f"💾 Saved for docking as: {final_output_path}")
+    print(f"Saved for docking as: {final_output_path}")
 
 def add_sidechains(input_pdb, output_pdb):
     """
     Reconstructs missing sidechains and atoms using PDBFixer.
     """
-    print(f"🔧 Reconstructing sidechains for {input_pdb}...")
+    print(f"Reconstructing sidechains for {input_pdb}...")
     
     try:
         # 1. Load the backbone structure
@@ -133,11 +133,11 @@ def add_sidechains(input_pdb, output_pdb):
         with open(output_pdb, 'w') as f:
             PDBFile.writeFile(fixer.topology, fixer.positions, f)
             
-        print(f"✅ Full atom structure saved to {output_pdb}")
+        print(f"Full atom structure saved to {output_pdb}")
         return True
         
     except Exception as e:
-        print(f"❌ Failed to reconstruct sidechains: {e}")
+        print(f"Failed to reconstruct sidechains: {e}")
         return False
 
 # --- MAIN EXECUTION ---
