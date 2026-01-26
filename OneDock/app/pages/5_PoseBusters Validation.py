@@ -44,7 +44,7 @@ if not os.path.exists(result_file):
 df = pd.read_csv(result_file)
 
 # Load reference results if available for specificity and rank gain calculation
-ref_file = "data/results/docking_report_reference.csv"
+ref_file = f"data/results/docking_report_reference_{lib_name}.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     

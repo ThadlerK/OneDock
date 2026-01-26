@@ -93,22 +93,95 @@ if job_active:
 else:
     # --- INPUT MODE ---
     if df is not None:
+        
+        # 1. DELTA RANK BERECHNUNG (falls Referenz vorhanden)
+        # Wir versuchen, die Datei basierend auf der Config zu finden
+        ref_lib_name = config.get("library_name", "")
+        REF_FILE = f"data/results/docking_report_reference_{ref_lib_name}.csv"
+        
+        has_rank_metric = False
+        
+        if os.path.exists(REF_FILE):
+            try:
+                df_r = pd.read_csv(REF_FILE)
+                # Sicherstellen, dass Spaltennamen passen
+                if "Affinity_kcal_mol" in df_r.columns:
+                    df_r = df_r.rename(columns={"Affinity_kcal_mol": "Affinity_Ref"})
+                
+                # Ränge berechnen (Niedrigere Energie = Besserer Rang -> 1 ist bester)
+                df["Rank_Target"] = df["Affinity_kcal_mol"].rank(method="min", ascending=True)
+                df_r["Rank_Ref"] = df_r["Affinity_Ref"].rank(method="min", ascending=True)
+                
+                # Mergen
+                df = pd.merge(df, df_r[["Ligand", "Affinity_Ref", "Rank_Ref"]], on="Ligand", how="left")
+                
+                # Delta Rank berechnen (Positiv = Verbesserung im Target)
+                # Bsp: Ref Rank 100 (schlecht) - Target Rank 10 (gut) = +90 Gain
+                df["Delta_Rank"] = df["Rank_Ref"] - df["Rank_Target"]
+                has_rank_metric = True
+            except Exception as e:
+                st.warning(f"Konnte Referenzdaten nicht verarbeiten: {e}")
+
+        # 2. UI EINGABEN
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("Selection")
-            top_n = st.number_input("Analyze Top N Ligands", min_value=1, max_value=50, value=config.get("mmpbsa", {}).get("top_n", 5))
-            ranks_per_ligand = st.slider("Poses per Ligand", 1, 5, 1)
+            st.subheader("Selection Strategy")
+            
+            # Auswahl: Top N
+            default_top_n = config.get("mmpbsa", {}).get("top_n", 5)
+            top_n = st.number_input("Auto-Select Top N Ligands", min_value=0, max_value=50, value=default_top_n, help="Sorting by **Highest Rank Gain** (Delta Rank)")
+            
+            # Info, wonach sortiert wird
+            if has_rank_metric:
+                st.success(f"Sorting by **Highest Rank Gain** (Delta Rank)")
+            else:
+                st.info("Sorting by **Affinity** (Reference not found)")
+
+            # ZUSÄTZLICH: Manuelle Auswahl
+            all_ligands = sorted(df["Ligand"].unique().tolist())
+            manual_selection = st.multiselect(
+                "Add specific ligands manually (optional)", 
+                options=all_ligands,
+                help="These ligands are addtionally analysed."
+            )
 
         with col2:
             st.subheader("MD Parameters")
+            ranks_per_ligand = st.slider("Poses per Ligand", 1, 5, 1)
             heat_steps = st.number_input("Heat Steps", value=config.get("mmpbsa", {}).get("md_steps_heat", 20000))
             prod_steps = st.number_input("Production Steps", value=config.get("mmpbsa", {}).get("md_steps_prod", 100000))
 
-        # Identify Targets
-        top_ligands = df.sort_values("Affinity_kcal_mol").head(top_n)["Ligand"].tolist()
-        st.write(f"**Target Ligands:** {', '.join(top_ligands)}")
-        st.info(f"Total simulations: {len(top_ligands)} ligands × {ranks_per_ligand} poses = {len(top_ligands)*ranks_per_ligand} runs")
+        # 3. LISTE ERSTELLEN
+        # A. Automatische Auswahl (Top N)
+        if top_n > 0:
+            if has_rank_metric:
+                # Sortieren nach Delta Rank (Absteigend -> Höchster Gewinn zuerst)
+                # NaNs (keine Ref-Daten) werden ans Ende geschoben
+                df_sorted = df.sort_values("Delta_Rank", ascending=False)
+            else:
+                # Fallback: Sortieren nach Affinity (Aufsteigend -> Niedrigste Energie zuerst)
+                df_sorted = df.sort_values("Affinity_kcal_mol", ascending=True)
+            
+            auto_ligands = df_sorted.head(top_n)["Ligand"].tolist()
+        else:
+            auto_ligands = []
+
+        # B. Zusammenführen (Auto + Manuell) und Duplikate entfernen
+        final_selection = list(set(auto_ligands + manual_selection))
+        
+        # Anzeigen
+        if final_selection:
+            st.write(f"**Selected Ligands ({len(final_selection)}):** {', '.join(final_selection)}")
+            
+            # Warnung bei großen Jobs
+            total_runs = len(final_selection) * ranks_per_ligand
+            if total_runs > 20:
+                st.warning(f"⚠️ High workload: {total_runs} simulations. This might take a long time.")
+            else:
+                st.info(f"Total simulations: {len(final_selection)} ligands × {ranks_per_ligand} poses = {total_runs} runs")
+        else:
+            st.warning("No ligands selected via Top N or Manual input.")
 
         if st.button("Launch MMPBSA Pipeline (Background)"):
             # 1. Save Config
