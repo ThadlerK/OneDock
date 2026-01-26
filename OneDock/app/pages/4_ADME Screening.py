@@ -6,7 +6,15 @@ import requests
 from io import StringIO
 
 st.title("ADME Screening")
-st.markdown("")
+st.markdown("### SwissADME-based Property Prediction")
+
+# Display information about SwissADME
+st.info("""
+**SwissADME** is a web-based tool that uses a variety of predictive models to compute physicochemical descriptors of small molecules from their structure.
+
+Reference: Daina, A., Michielin, O., & Zoete, V. (2017). SwissADME: a free web tool to evaluate pharmacokinetics, drug-likeness and medicinal chemistry friendliness of small molecules. *Scientific reports, 7*(1), 42717.
+""")
+
 st.set_page_config(page_title = "ADME Screening")
 # Ensure output directory exists
 os.makedirs("data/results/output", exist_ok=True)
@@ -29,13 +37,23 @@ if 'Ligand' in df.columns:
 if 'Smiles' in df.columns:
     df['SMILES'] = df['Smiles']
 
-# Load reference results if available for specificity calculation
+# Load reference results if available for specificity and rank gain calculation
 ref_file = "data/results/docking_report_reference.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     if 'Ligand' in df_ref.columns:
         df_ref = df_ref.rename(columns={'Ligand': 'Ligand_ID'})
     
+    # Sort by affinity to assign ranks
+    df_target_sorted = df.sort_values('Affinity_kcal_mol').reset_index(drop=True)
+    df_target_sorted['Rank_Target'] = df_target_sorted.index + 1
+    
+    df_ref_sorted = df_ref.sort_values('Affinity_kcal_mol').reset_index(drop=True)
+    df_ref_sorted['Rank_Ref'] = df_ref_sorted.index + 1
+    
+    # Merge ranks and reference affinity
+    df = df.merge(df_target_sorted[['Ligand_ID', 'Rank_Target']], on='Ligand_ID', how='left')
+    df = df.merge(df_ref_sorted[['Ligand_ID', 'Rank_Ref']], on='Ligand_ID', how='left')
     df = df.merge(
         df_ref[['Ligand_ID', 'Affinity_kcal_mol']],
         on='Ligand_ID',
@@ -43,9 +61,12 @@ if os.path.exists(ref_file):
         suffixes=('', '_ref')
     )
     df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
+    df['Rank_Gain'] = df['Rank_Ref'] - df['Rank_Target']
     has_specificity = True
+    has_rank_gain = True
 else:
     has_specificity = False
+    has_rank_gain = False
 
 df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
@@ -67,40 +88,68 @@ if 'adme_filter_values' not in st.session_state:
     }
 
 # --- CUSTOM CUTOFF FILTERS ---
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     affinity_cutoff = st.number_input(
-        "Target Affinity ≤ (kcal/mol):",
+        "Max Target Affinity (kcal/mol):",
         value=st.session_state.affinity_cutoff,
         step=0.5,
-        key='adme_affinity'
+        key='adme_affinity',
+        help="Show only ligands with affinity ≤ this value."
     )
     st.session_state.affinity_cutoff = affinity_cutoff
 
 with col2:
     if has_specificity:
         specificity_cutoff = st.number_input(
-            "Specificity ≤:",
+            "Max Specificity:",
             value=st.session_state.specificity_cutoff,
             step=0.5,
-            key='adme_specificity'
+            key='adme_specificity',
+            help="Show only ligands with specificity ≤ this value."
         )
         st.session_state.specificity_cutoff = specificity_cutoff
     else:
-        st.info("No reference data - specificity filter not available")
+        st.warning("⚠️ No reference data - specificity filter not available")
         specificity_cutoff = None
 
+with col3:
+    if has_rank_gain:
+        min_rank_gain = int(df['Rank_Gain'].min())
+        max_rank_gain = int(df['Rank_Gain'].max())
+        rank_gain_cutoff = st.number_input(
+            "Min Rank Gain:",
+            min_value=min_rank_gain,
+            max_value=max_rank_gain,
+            value=st.session_state.get('rank_gain_cutoff', min_rank_gain),
+            step=1,
+            key='adme_rank_gain',
+            help="Show only ligands with rank gain ≥ this value."
+        )
+        st.session_state.rank_gain_cutoff = rank_gain_cutoff
+    else:
+        st.warning("⚠️ No reference data - rank gain filter not available")
+        rank_gain_cutoff = None
+
 # Apply filters
+selected_df = df_sorted[df_sorted['Affinity_kcal_mol'] <= affinity_cutoff].copy()
+
 if has_specificity and specificity_cutoff is not None:
-    selected_df = df_sorted[
-        (df_sorted['Affinity_kcal_mol'] <= affinity_cutoff) &
-        (df_sorted['Specificity'] <= specificity_cutoff)
-    ][['Ligand_ID', 'Affinity_kcal_mol', 'Specificity', 'SMILES']].copy()
-else:
-    selected_df = df_sorted[
-        df_sorted['Affinity_kcal_mol'] <= affinity_cutoff
-    ][['Ligand_ID', 'Affinity_kcal_mol', 'SMILES']].copy()
+    selected_df = selected_df[selected_df['Specificity'] <= specificity_cutoff]
+
+if has_rank_gain and rank_gain_cutoff is not None:
+    selected_df = selected_df[selected_df['Rank_Gain'] >= rank_gain_cutoff]
+
+# Select display columns
+display_cols = ['Ligand_ID', 'Affinity_kcal_mol']
+if has_specificity:
+    display_cols.append('Specificity')
+if has_rank_gain:
+    display_cols.append('Rank_Gain')
+display_cols.append('SMILES')
+
+selected_df = selected_df[display_cols].copy()
 
 selected_ligands = selected_df['Ligand_ID'].tolist()
 
@@ -124,7 +173,7 @@ if st.session_state.adme_merged_df is not None:
     merged_df = st.session_state.adme_merged_df
     
     # Display merged data
-    st.subheader("Combined Docking & ADME Results")
+    st.subheader("ADME Results")
     
     # Mapping for display
     column_mapping = {
@@ -136,9 +185,13 @@ if st.session_state.adme_merged_df is not None:
         'Num. H-bond acceptors': '#H-bond acceptors',
         'Num. H-bond donors': '#H-bond donors',
         'Consensus Log Po/w': 'Consensus Log P',
+        'TPSA': 'TPSA',
+        'Rotatable Bonds': '#Rotatable bonds',
+        'Aromatic Rings': '#Aromatic heavy atoms',
         'GI absorption': 'GI absorption',
         'BBB permeant': 'BBB permeant',
         'Lipinski #violations': 'Lipinski #violations',
+        'PAINS alerts': 'PAINS #alerts',
         'Bioavailability Score': 'Bioavailability Score',
         'Synthetic accessibility': 'Synthetic Accessibility'
     }
@@ -161,6 +214,36 @@ if st.session_state.adme_merged_df is not None:
         if missing_columns:
             st.warning(f"Some columns are not present: {', '.join(missing_columns)}")
     
+    # Parameter descriptions
+    with st.expander("Parameter Information"):
+        st.markdown("""
+        **Molecular Weight (MW):** Mass of the molecule in Daltons. Drug-like compounds typically have MW&nbsp;≤&nbsp;500&nbsp;Da.
+        
+        **H-bond Donors:** Number of hydrogen atoms attached to nitrogen or oxygen atoms that can donate hydrogen bonds. Lipinski:&nbsp;≤&nbsp;5.
+        
+        **H-bond Acceptors:** Number of nitrogen or oxygen atoms that can accept hydrogen bonds. Lipinski:&nbsp;≤&nbsp;10.
+        
+        **Consensus Log P:** Average of five different calculation methods for the octanol-water partition coefficient. Measures lipophilicity. Lipinski:&nbsp;≤&nbsp;5.
+        
+        **TPSA (Topological Polar Surface Area):** Sum of surfaces of polar atoms (usually oxygens and nitrogens). Influences membrane permeability. Good oral bioavailability:&nbsp;<&nbsp;140&nbsp;Ų.
+        
+        **Rotatable Bonds:** Number of bonds that allow free rotation. Too many reduce oral bioavailability. Recommended:&nbsp;<&nbsp;10.
+        
+        **Aromatic Rings:** Number of aromatic heavy atoms. Important for protein binding but too many can reduce bioavailability. Optimal:&nbsp;1-5&nbsp;rings.
+        
+        **GI Absorption:** Predicted gastrointestinal absorption (High/Low).
+        
+        **BBB Permeant:** Blood-Brain Barrier permeability (Yes/No).
+        
+        **Lipinski #violations:** Number of Lipinski Rule of Five violations. 0-1&nbsp;violations indicate drug-like properties.
+        
+        **PAINS alerts:** Pan-Assay Interference Compounds - structural patterns that frequently cause false-positive results in assays. Should be&nbsp;0 for reliable compounds.
+        
+        **Bioavailability Score:** Probability of good oral bioavailability. SwissADME assigns discrete values: 0.55&nbsp;or&nbsp;0.56&nbsp;=&nbsp;Excellent, 0.17&nbsp;=&nbsp;Medium, 0.11&nbsp;=&nbsp;Low, <&nbsp;0.11&nbsp;=&nbsp;Poor. Higher is better.
+        
+        **Synthetic Accessibility:** Estimated ease of synthesis (1&nbsp;=&nbsp;very easy, 10&nbsp;=&nbsp;very difficult).
+        """, unsafe_allow_html=True)
+    
     # Download button
     csv = merged_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -174,14 +257,15 @@ if st.session_state.adme_merged_df is not None:
     st.markdown("---")
     st.subheader("Druglikeness Filtering")
     
-    st.markdown(
-        "**Lipinski's Rule of Five** defines criteria for oral bioavailability:\n\n"
-        "- MW ≤ 500 Da\n"
-        "- H-bond donors ≤ 5\n"
-        "- H-bond acceptors ≤ 10\n"
-        "- cLogP ≤ 5\n\n"
-        "Compounds violating more than one criterion typically exhibit poor oral absorption."
-    )
+    with st.container(border=True):
+        st.markdown(
+            "**Lipinski's Rule of Five** defines criteria for oral bioavailability:\n\n"
+            "- MW ≤ 500 Da\n"
+            "- H-bond donors ≤ 5\n"
+            "- H-bond acceptors ≤ 10\n"
+            "- cLogP ≤ 5\n\n"
+            "Compounds violating more than one criterion typically exhibit poor oral absorption."
+        )
     
     if all(col in merged_df.columns for col in ['MW', '#H-bond donors', '#H-bond acceptors', 'Consensus Log P']):
         col1, col2 = st.columns(2)

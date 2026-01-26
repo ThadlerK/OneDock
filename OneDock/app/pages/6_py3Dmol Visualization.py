@@ -33,11 +33,21 @@ if not os.path.exists(result_file):
 # Load docking results
 df = pd.read_csv(result_file)
 
-# Load reference results if available for specificity calculation
+# Load reference results if available for specificity and rank gain calculation
 ref_file = "data/results/docking_report_reference.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     
+    # Sort by affinity to assign ranks
+    df_target_sorted = df.sort_values('Affinity_kcal_mol').reset_index(drop=True)
+    df_target_sorted['Rank_Target'] = df_target_sorted.index + 1
+    
+    df_ref_sorted = df_ref.sort_values('Affinity_kcal_mol').reset_index(drop=True)
+    df_ref_sorted['Rank_Ref'] = df_ref_sorted.index + 1
+    
+    # Merge ranks and reference affinity
+    df = df.merge(df_target_sorted[['Ligand', 'Rank_Target']], on='Ligand', how='left')
+    df = df.merge(df_ref_sorted[['Ligand', 'Rank_Ref']], on='Ligand', how='left')
     df = df.merge(
         df_ref[['Ligand', 'Affinity_kcal_mol']],
         on='Ligand',
@@ -45,9 +55,12 @@ if os.path.exists(ref_file):
         suffixes=('', '_ref')
     )
     df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
+    df['Rank_Gain'] = df['Rank_Ref'] - df['Rank_Target']
     has_specificity = True
+    has_rank_gain = True
 else:
     has_specificity = False
+    has_rank_gain = False
 
 df_sorted = df.sort_values(by="Affinity_kcal_mol")
 
@@ -80,40 +93,58 @@ if 'py3dmol_just_created' not in st.session_state:
     st.session_state.py3dmol_just_created = False
 
 # --- CUSTOM CUTOFF FILTERS ---
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     affinity_cutoff = st.number_input(
-        "Target Affinity ≤ (kcal/mol):",
+        "Max Target Affinity (kcal/mol):",
         value=st.session_state.affinity_cutoff,
         step=0.5,
-        key='py3d_affinity'
+        key='py3d_affinity',
+        help="Show only ligands with affinity ≤ this value."
     )
     st.session_state.affinity_cutoff = affinity_cutoff
 
 with col2:
     if has_specificity:
         specificity_cutoff = st.number_input(
-            "Specificity ≤:",
+            "Max Specificity:",
             value=st.session_state.specificity_cutoff,
             step=0.5,
-            key='py3d_specificity'
+            key='py3d_specificity',
+            help="Show only ligands with specificity ≤ this value."
         )
         st.session_state.specificity_cutoff = specificity_cutoff
     else:
-        st.info("No reference data - specificity filter not available")
+        st.warning("⚠️ No reference data - specificity filter not available")
         specificity_cutoff = None
 
+with col3:
+    if has_rank_gain:
+        min_rank_gain = int(df['Rank_Gain'].min())
+        max_rank_gain = int(df['Rank_Gain'].max())
+        rank_gain_cutoff = st.number_input(
+            "Min Rank Gain:",
+            min_value=min_rank_gain,
+            max_value=max_rank_gain,
+            value=st.session_state.get('rank_gain_cutoff', min_rank_gain),
+            step=1,
+            key='py3d_rank_gain',
+            help="Show only ligands with rank gain ≥ this value."
+        )
+        st.session_state.rank_gain_cutoff = rank_gain_cutoff
+    else:
+        st.warning("⚠️ No reference data - rank gain filter not available")
+        rank_gain_cutoff = None
+
 # Apply filters
+df_display = df_sorted[df_sorted['Affinity_kcal_mol'] <= affinity_cutoff]
+
 if has_specificity and specificity_cutoff is not None:
-    df_display = df_sorted[
-        (df_sorted['Affinity_kcal_mol'] <= affinity_cutoff) &
-        (df_sorted['Specificity'] <= specificity_cutoff)
-    ]
-else:
-    df_display = df_sorted[
-        df_sorted['Affinity_kcal_mol'] <= affinity_cutoff
-    ]
+    df_display = df_display[df_display['Specificity'] <= specificity_cutoff]
+
+if has_rank_gain and rank_gain_cutoff is not None:
+    df_display = df_display[df_display['Rank_Gain'] >= rank_gain_cutoff]
 
 # Display table with selection
 st.write(f"Showing {len(df_display)} ligands:")
@@ -132,7 +163,11 @@ def format_ligand_label(x):
     
     if has_specificity and 'Specificity' in df_display.columns:
         specificity = df_display[df_display['Ligand']==x]['Specificity'].values[0]
-        label += f", Specificity: {specificity:.2f}"
+        label += f", Spec: {specificity:.2f}"
+    
+    if has_rank_gain and 'Rank_Gain' in df_display.columns:
+        rank_gain = df_display[df_display['Ligand']==x]['Rank_Gain'].values[0]
+        label += f", RG: {rank_gain:+d}"
     
     label += " kcal/mol)"
     return label

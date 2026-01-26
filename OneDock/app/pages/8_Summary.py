@@ -95,7 +95,10 @@ def load_summary_data(target_path, ref_path):
     # Round affinity to 2 decimal places
     df['Affinity_Target'] = df['Affinity_Target'].round(2)
     
-    # Load reference if available and calculate specificity
+    # Extract rank from ligand name if present (e.g., lig_00000_rank1)
+    df['Rank'] = df['Ligand'].str.extract(r'_rank(\d+)$')[0].fillna('1').astype(int)
+    
+    # Load reference if available and calculate specificity & rank gain
     if os.path.exists(ref_path):
         df_ref = pd.read_csv(ref_path)
         df_ref = df_ref.rename(columns={
@@ -103,10 +106,37 @@ def load_summary_data(target_path, ref_path):
             'Ligand': 'Ligand'
         })
         
+        # Sort by affinity to assign ranks
+        df_target_sorted = df.sort_values('Affinity_Target').reset_index(drop=True)
+        df_target_sorted['Rank_Target'] = df_target_sorted.index + 1
+        
+        df_ref_sorted = df_ref.sort_values('Affinity_Ref').reset_index(drop=True)
+        df_ref_sorted['Rank_Ref'] = df_ref_sorted.index + 1
+        
+        # Merge ranks back to original df
+        df = df.merge(df_target_sorted[['Ligand', 'Rank_Target']], on='Ligand', how='left')
+        df = df.merge(df_ref_sorted[['Ligand', 'Rank_Ref']], on='Ligand', how='left')
         df = df.merge(df_ref[['Ligand', 'Affinity_Ref']], on='Ligand', how='left')
+        
         df['Specificity'] = (df['Affinity_Target'] - df['Affinity_Ref']).round(2)
+        df['Rank_Gain'] = (df['Rank_Ref'] - df['Rank_Target']).astype(int)
     else:
         df['Specificity'] = None
+        df['Rank_Gain'] = None
+    
+    # Load ADME data if available
+    adme_file = "data/results/output/swissadme_results.csv"
+    if os.path.exists(adme_file):
+        adme_df = pd.read_csv(adme_file)
+        # Determine merge key
+        if 'Molecule' in adme_df.columns:
+            merge_key = 'Molecule'
+        elif 'Name' in adme_df.columns:
+            merge_key = 'Name'
+        else:
+            merge_key = adme_df.columns[0]
+        
+        df = df.merge(adme_df, left_on='Ligand', right_on=merge_key, how='left')
     
     # Calculate pocket residues for each ligand
     receptor_pdbqt = "data/interim/target_prep.pdbqt"
@@ -182,55 +212,215 @@ if df is None:
 
 # --- INITIALIZE SESSION STATE ---
 if 'affinity_cutoff' not in st.session_state:
-    st.session_state.affinity_cutoff = -3.0
+    st.session_state.affinity_cutoff = 0.0
 if 'specificity_cutoff' not in st.session_state:
     st.session_state.specificity_cutoff = 0.0
+if 'rank_filter' not in st.session_state:
+    st.session_state.rank_filter = 1
 
-# --- FILTER CONTROLS ---
-has_specificity = df['Specificity'].notna().any()
+# Ensure lipinski_filter is always defined
+if 'lipinski_filter' not in locals():
+    lipinski_filter = "All"
 
-col1, col2 = st.columns(2)
+# --- MAIN FILTER CONTROLS ---
+col1, col2, col3 = st.columns(3)
 
 with col1:
     affinity_cutoff = st.number_input(
-        "Target Affinity ≤ (kcal/mol):",
-        value=st.session_state.affinity_cutoff,
+        "Max Target Affinity (kcal/mol):",
+        value=0.0,
         step=0.5,
-        key='summary_affinity'
+        key='summary_affinity',
+        help="Show only ligands with affinity ≤ this value."
     )
-    st.session_state.affinity_cutoff = affinity_cutoff
 
 with col2:
+    has_specificity = df['Specificity'].notna().any()
     if has_specificity:
         specificity_cutoff = st.number_input(
-            "Specificity ≤:",
-            value=st.session_state.specificity_cutoff,
+            "Max Specificity:",
+            value=0.0,
             step=0.5,
-            key='summary_specificity'
+            key='summary_specificity',
+            help="Show only ligands with specificity ≤ this value."
         )
-        st.session_state.specificity_cutoff = specificity_cutoff
     else:
-        st.info("No reference data - specificity filter not available")
+        st.warning("⚠️ No reference data - specificity filter not available")
         specificity_cutoff = None
 
+with col3:
+    has_rank_gain = df['Rank_Gain'].notna().any()
+    if has_rank_gain:
+        min_rank_gain = int(df['Rank_Gain'].min())
+        max_rank_gain = int(df['Rank_Gain'].max())
+        rank_gain_cutoff = st.number_input(
+            "Min Rank Gain:",
+            min_value=min_rank_gain,
+            max_value=max_rank_gain,
+            value=min_rank_gain,
+            step=1,
+            key='summary_rank_gain',
+            help="Show only ligands with rank gain ≥ this value."
+        )
+    else:
+        st.warning("⚠️ No reference data - rank gain filter not available")
+        rank_gain_cutoff = None
+
+# --- ADVANCED ADME FILTERS ---
+
+# --- ADVANCED ADME FILTERS (Dropdown) ---
+
+# --- ADVANCED ADME FILTERS (Alle nebeneinander) ---
+with st.expander("Advanced Filters"):
+    adme_col1, adme_col2, adme_col3, adme_col4 = st.columns(4)
+    with adme_col1:
+        max_tpsa = st.number_input(
+            "Max TPSA (Ų):",
+            min_value=0.0,
+            max_value=300.0,
+            value=140.0,
+            step=10.0,
+            help="Topological Polar Surface Area. Recommended: < 140 Ų"
+        )
+        max_rotatable = st.number_input(
+            "Max Rotatable Bonds:",
+            min_value=0,
+            max_value=20,
+            value=10,
+            step=1,
+            help="Recommended: < 10"
+        )
+        max_aromatic = st.number_input(
+            "Max Aromatic Atoms:",
+            min_value=0,
+            max_value=50,
+            value=30,
+            step=5,
+            help="Optimal: 1-5 aromatic rings"
+        )
+    with adme_col2:
+        max_pains = st.number_input(
+            "Max PAINS Alerts:",
+            min_value=0,
+            max_value=10,
+            value=0,
+            step=1,
+            help="Should be 0 for reliable compounds"
+        )
+        gi_filter = st.selectbox(
+            "GI Absorption:",
+            options=["All", "High", "Low"],
+            help="Gastrointestinal absorption"
+        )
+        bbb_filter = st.selectbox(
+            "BBB Permeant:",
+            options=["All", "Yes", "No"],
+            help="Blood-Brain Barrier permeability"
+        )
+    with adme_col3:
+        min_bioavail = st.number_input(
+            "Min Bioavailability Score:",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.11,
+            step=0.01,
+            help="0.55 = Good, 0.17 = Medium, 0.11 = Low"
+        )
+        max_synth_access = st.number_input(
+            "Max Synthetic Accessibility:",
+            min_value=1.0,
+            max_value=10.0,
+            value=10.0,
+            step=0.1,
+            help="Lower is easier to synthesize (1=easy, 10=difficult)"
+        )
+    with adme_col4:
+        min_posebusters = st.number_input(
+            "Min PoseBusters Quality Score (%):",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=1.0,
+            help="80-100%: High quality pose"
+        )
+        lipinski_filter = st.selectbox(
+            "Lipinski Rule of Five:",
+            options=["All", "Pass", "Fail"],
+            help="MW≤500, HBD≤5, HBA≤10, cLogP≤5. >1 violation: poor oral absorption."
+        )
+
 # --- APPLY FILTERS ---
+# Start with base affinity filter
+df = df[df['Affinity_Target'] <= affinity_cutoff]
+
+# Apply specificity filter
 if has_specificity and specificity_cutoff is not None:
-    df = df[
-        (df['Affinity_Target'] <= affinity_cutoff) &
-        (df['Specificity'] <= specificity_cutoff)
-    ]
-else:
-    df = df[df['Affinity_Target'] <= affinity_cutoff]
+    df = df[df['Specificity'] <= specificity_cutoff]
+
+# Apply rank gain filter
+if has_rank_gain and rank_gain_cutoff is not None:
+    df = df[df['Rank_Gain'] >= rank_gain_cutoff]
+
+# Apply ADME filters
+if max_tpsa is not None and 'TPSA' in df.columns:
+    df = df[df['TPSA'] <= max_tpsa]
+
+if max_rotatable is not None and '#Rotatable bonds' in df.columns:
+    df = df[df['#Rotatable bonds'] <= max_rotatable]
+
+if max_aromatic is not None and '#Aromatic heavy atoms' in df.columns:
+    df = df[df['#Aromatic heavy atoms'] <= max_aromatic]
+
+if max_pains is not None and 'PAINS #alerts' in df.columns:
+    df = df[df['PAINS #alerts'] <= max_pains]
+
+if gi_filter != "All" and 'GI absorption' in df.columns:
+    df = df[df['GI absorption'] == gi_filter]
+
+if bbb_filter != "All" and 'BBB permeant' in df.columns:
+    df = df[df['BBB permeant'] == bbb_filter]
+
+if min_bioavail is not None and 'Bioavailability Score' in df.columns:
+    df = df[df['Bioavailability Score'] >= min_bioavail]
+
+if max_synth_access is not None and 'Synthetic accessibility' in df.columns:
+    df = df[df['Synthetic accessibility'] <= max_synth_access]
+
+# Apply PoseBusters Score filter
+if min_posebusters is not None:
+    if 'PoseBusters (%)' in df.columns:
+        df = df[df['PoseBusters (%)'].astype(float) >= min_posebusters]
+    elif 'PoseBusters_Score' in df.columns:
+        df = df[df['PoseBusters_Score'].astype(float) >= min_posebusters]
+
+# Apply Lipinski filter
+if (('Lipinski RO5' in df.columns) or ('Lipinski_RO5' in df.columns)) and lipinski_filter != "All":
+    lip_col = 'Lipinski RO5' if 'Lipinski RO5' in df.columns else 'Lipinski_RO5'
+    if lipinski_filter == "Pass":
+        df = df[df[lip_col].str.startswith('Pass')]
+    elif lipinski_filter == "Fail":
+        df = df[df[lip_col] == 'Fail']
 
 # --- DISPLAY SUMMARY TABLE ---
 st.subheader("Summary Table")
 
-# Prepare display dataframe
-display_columns = ['Ligand', 'Affinity_Target', 'Specificity', 'Pocket_Residues']
+# Prepare display dataframe - base columns
+display_columns = ['Ligand', 'Affinity_Target', 'Specificity', 'Rank_Gain', 'Pocket_Residues']
+
+# Add optional columns
 if 'PoseBusters_Score' in df.columns:
     display_columns.append('PoseBusters_Score')
 if 'Lipinski_RO5' in df.columns:
     display_columns.append('Lipinski_RO5')
+
+# Add ADME columns if available
+adme_cols = ['TPSA', '#Rotatable bonds', '#Aromatic heavy atoms', 'PAINS #alerts', 
+             'GI absorption', 'BBB permeant', 'Bioavailability Score', 'Synthetic accessibility']
+for col in adme_cols:
+    if col in df.columns:
+        display_columns.append(col)
+
+# Add SMILES at the end
 if 'Smiles' in df.columns:
     display_columns.append('Smiles')
 
@@ -239,7 +429,15 @@ df_display = df[display_columns].copy()
 # Rename for better display
 rename_dict = {
     'Affinity_Target': 'Target (kcal/mol)',
-    'Pocket_Residues': 'Pocket Residues'
+    'Pocket_Residues': 'Pocket Residues',
+    'TPSA': 'TPSA (Ų)',
+    '#Rotatable bonds': 'Rotatable Bonds',
+    '#Aromatic heavy atoms': 'Aromatic Atoms',
+    'PAINS #alerts': 'PAINS',
+    'GI absorption': 'GI Absorption',
+    'BBB permeant': 'BBB Permeant',
+    'Bioavailability Score': 'Bioavailability',
+    'Synthetic accessibility': 'Synth. Access.'
 }
 if 'PoseBusters_Score' in df_display.columns:
     rename_dict['PoseBusters_Score'] = 'PoseBusters (%)'
@@ -248,17 +446,42 @@ if 'Lipinski_RO5' in df_display.columns:
 
 df_display = df_display.rename(columns=rename_dict)
 
+# Format all float columns with dot as decimal separator for display and CSV export
+for col in df_display.select_dtypes(include=['float', 'float64']).columns:
+    df_display[col] = df_display[col].map(lambda x: f"{x:.3f}" if pd.notnull(x) else "")
+
 # Configure AgGrid
 gb = GridOptionsBuilder.from_dataframe(df_display)
 gb.configure_selection(selection_mode='single', use_checkbox=False)
-gb.configure_column("Ligand", width=120)
+gb.configure_column("Ligand", width=120, pinned='left')
 gb.configure_column("Target (kcal/mol)", width=150, type=["numericColumn", "numberColumnFilter"])
 gb.configure_column("Specificity", width=120, type=["numericColumn", "numberColumnFilter"])
+if 'Rank Gain' in df_display.columns:
+    gb.configure_column("Rank Gain", width=120, type=["numericColumn", "numberColumnFilter"])
 gb.configure_column("Pocket Residues", width=400, wrapText=True, autoHeight=True)
+
 if 'PoseBusters (%)' in df_display.columns:
     gb.configure_column("PoseBusters (%)", width=130, type=["numericColumn", "numberColumnFilter"])
 if 'Lipinski RO5' in df_display.columns:
-    gb.configure_column("Lipinski RO5", width=150)
+    gb.configure_column("Lipinski RO5", width=120)
+
+# Configure ADME columns
+if 'TPSA (Ų)' in df_display.columns:
+    gb.configure_column("TPSA (Ų)", width=110, type=["numericColumn", "numberColumnFilter"])
+if 'Rotatable Bonds' in df_display.columns:
+    gb.configure_column("Rotatable Bonds", width=130, type=["numericColumn", "numberColumnFilter"])
+if 'Aromatic Atoms' in df_display.columns:
+    gb.configure_column("Aromatic Atoms", width=130, type=["numericColumn", "numberColumnFilter"])
+if 'PAINS' in df_display.columns:
+    gb.configure_column("PAINS", width=100, type=["numericColumn", "numberColumnFilter"])
+if 'GI Absorption' in df_display.columns:
+    gb.configure_column("GI Absorption", width=120)
+if 'BBB Permeant' in df_display.columns:
+    gb.configure_column("BBB Permeant", width=120)
+if 'Bioavailability' in df_display.columns:
+    gb.configure_column("Bioavailability", width=130, type=["numericColumn", "numberColumnFilter"])
+if 'Synth. Access.' in df_display.columns:
+    gb.configure_column("Synth. Access.", width=130, type=["numericColumn", "numberColumnFilter"])
 
 if 'Smiles' in df_display.columns:
     gb.configure_column("Smiles", hide=True)
@@ -296,11 +519,60 @@ if selected_rows is not None and len(selected_rows) > 0:
         else:
             st.markdown("**Specificity:** N/A (no reference)")
         
+        # Display SMILES and PubChem link
+        if 'Smiles' in selected_row and selected_row['Smiles']:
+            smiles = selected_row['Smiles']
+            st.markdown(f"**SMILES:** `{smiles}`")
+            
+            # Try to fetch IUPAC name and description from PubChem
+            import urllib.parse
+            import requests
+            smiles_for_url = smiles.replace('+', '').replace('-', '')
+            
+            # Try to get IUPAC name and CID from PubChem API
+            iupac_name = None
+            cid = None
+            description = None
+            
+            try:
+                # Search for compound by SMILES to get CID and IUPAC name
+                search_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{urllib.parse.quote(smiles_for_url)}/property/IUPACName/JSON"
+                response = requests.get(search_url, timeout=3)
+                if response.status_code == 200:
+                    data = response.json()
+                    if 'PropertyTable' in data and 'Properties' in data['PropertyTable']:
+                        props = data['PropertyTable']['Properties'][0]
+                        iupac_name = props.get('IUPACName')
+                        cid = props.get('CID')
+                
+                # If we have a CID, try to get the description
+                if cid:
+                    desc_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/description/JSON"
+                    desc_response = requests.get(desc_url, timeout=3)
+                    if desc_response.status_code == 200:
+                        desc_data = desc_response.json()
+                        if 'InformationList' in desc_data and 'Information' in desc_data['InformationList']:
+                            descriptions = desc_data['InformationList']['Information']
+                            if descriptions and len(descriptions) > 0:
+                                description = descriptions[0].get('Description')
+            except:
+                pass
+            
+            # Display IUPAC name if found
+            if iupac_name:
+                st.markdown(f"**IUPAC Name:** {iupac_name}")
+            
+            # Display description if found
+            if description:
+                st.markdown(f"**Description:** {description}")
+            
+            # Create PubChem search link
+            smiles_encoded = urllib.parse.quote(smiles_for_url)
+            pubchem_url = f"https://pubchem.ncbi.nlm.nih.gov/#query={smiles_encoded}"
+            st.markdown(f"[Search on PubChem]({pubchem_url}) for further information")
+        
         st.markdown(f"**Pocket Residues:**")
         st.text(selected_row['Pocket Residues'])
-        
-        if 'Smiles' in selected_row:
-            st.markdown(f"**SMILES:** `{selected_row['Smiles']}`")
         
         # Add button to open in 3D Viewer
         st.markdown("")
