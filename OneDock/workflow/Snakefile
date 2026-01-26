@@ -5,12 +5,13 @@ configfile: "config/config.yaml"
 # Get the current Library Name (defaults to 'library' if missing)
 TARGET_LIB = config.get("library_name")
 
+# Run name
+RUN_NAME = config.get("run_name", "default_run")
+
 # Get ligand IDs from the split library
 ALL_IDS, = glob_wildcards("data/inputs/library_split/{id}.smi")
 LIGAND_IDS = [x for x in ALL_IDS if x.startswith(TARGET_LIB + "_")]
 
-if not LIGAND_IDS:
-    raise ValueError(f"No ligands found matching library '{TARGET_LIB}' in data/inputs/library_split/")
 
 # Define what to run: always target, optionally reference
 DOCKING_TARGETS = ["target"]
@@ -49,7 +50,7 @@ def get_docking_residues(wildcards):
 
 rule all:
     input:
-        expand("data/results/docking_report_{type}_{lib}.csv", type=DOCKING_TARGETS, lib=TARGET_LIB)
+        expand(f"data/results/docking_report_{type}_{TARGET_LIB}_{RUN_NAME}.csv", type=DOCKING_TARGETS)
 
 # Structure Preparation
 rule prepare_structure:
@@ -80,9 +81,9 @@ rule run_docking:
         receptor = "data/interim/{type}_prep.pdbqt",
         ligand   = "data/interim/ligands/{id}.pdbqt"
     output:
-        docked  = "data/results/{type}/poses/{id}_docked.pdbqt",
-        log     = "data/results/{type}/logs/{id}.log",
-        summary = "data/results/{type}/stats/{id}.csv"
+        docked  = f"data/results/{{type}}/{RUN_NAME}/poses/{{id}}_docked.pdbqt",
+        log     = f"data/results/{{type}}/{RUN_NAME}/logs/{{id}}.log",
+        summary = f"data/results/{{type}}/{RUN_NAME}/stats/{{id}}.csv"
     params:
         residues = get_docking_residues,
         exhaustiveness = config.get("exhaustiveness", 8),
@@ -108,9 +109,9 @@ rule run_docking:
 rule aggregate_results:
     input:
         # Double curly braces {{type}} allow the wildcard to pass through expand
-        expand("data/results/{{type}}/stats/{id}.csv", id=LIGAND_IDS)
+        expand("data/results/{{type}}/{RUN_NAME}/stats/{id}.csv", RUN_NAME=RUN_NAME, id=LIGAND_IDS)
     output:
-        f"data/results/docking_report_{{type}}_{TARGET_LIB}.csv"
+        f"data/results/docking_report_{{type}}_{TARGET_LIB}_{RUN_NAME}.csv"
     shell:
         """
         echo "Receptor,Ligand,Affinity_kcal_mol,Smiles,Grid_Size,Exhaustiveness,Pocket_Mode,Structure_Mode" > {output}
@@ -143,7 +144,7 @@ rule run_bioemu_generation:
 # 1. Prepare Ligand Reference (Antechamber needs a mol2)
 rule prep_lig_reference:
     input:
-        pdbqt = "data/results/target/poses/{id}_docked.pdbqt"
+        pdbqt = f"data/results/{{type}}/{RUN_NAME}/poses/{{id}}_docked.pdbqt"
     output:
         mol2 = "data/interim/mmpbsa/{id}_ref.mol2"
     conda:
@@ -156,7 +157,7 @@ rule prep_lig_reference:
 rule build_complex_rank:
     input:
         target = "data/inputs/target.pdb", # Uses your raw input
-        ligand = "data/results/target/poses/{id}_docked.pdbqt"
+        ligand = f"data/results/{{type}}/{RUN_NAME}/poses/{{id}}_docked.pdbqt"
     output:
         complex = "data/interim/mmpbsa/{id}_rank{rank}.pdb"
     conda:

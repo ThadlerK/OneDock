@@ -18,7 +18,7 @@ import py3Dmol
 from stmol import showmol
 
 # --- Local Imports ---
-from utils import save_config, reset_project
+from utils import save_config, reset_project, get_available_run_names, load_config
 
 st.set_page_config(page_title="Input", layout="wide")
 
@@ -346,6 +346,31 @@ if os.path.exists(PID_LIG_FILE) and not lig_job_running:
     
     # Cleanup
     if os.path.exists(PID_LIG_FILE): os.remove(PID_LIG_FILE)
+
+
+#Set run name
+current_library_name = load_config().get("library_name")
+if current_library_name is not None:
+    available_runs = get_available_run_names(current_library_name)
+
+    if not available_runs:
+        st.warning("No results found for this library.")
+        selected_run = None
+    else:
+        # Try to select the last used run from config as default
+        default_index = 0
+        last_run = load_config().get("run_name", "default_run")
+        if last_run in available_runs:
+            default_index = available_runs.index(last_run)
+            
+        selected_run = st.selectbox(
+            "Select Run / Experiment:", 
+            available_runs, 
+            index=default_index,
+            help="Choose a previous run based on grid parameters or experiment name."
+        )
+        save_config({"run_name": selected_run})
+
 
 
 # --- NAVIGATION ---

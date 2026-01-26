@@ -6,7 +6,7 @@ import os
 import signal
 import time
 import re
-from utils import save_config
+from utils import save_config, load_config
 
 st.set_page_config(page_title = "Docking")
 
@@ -201,7 +201,14 @@ else:
     # --------------------------------
     
     if st.button("Launch Docking Pipeline"):
+        pocket_known = load_config().get("pocket_known")
+        structure_known = load_config().get("structure_known")
+        pk = "kp" if pocket_known else "ukp"
+        sk = "ks" if structure_known else "uks"
+        run_name = f"G{grid_size}_E{exhaustiveness}_{pk}_{sk}"
+
         save_config({
+            "run_name": run_name,
             "grid_size": grid_size,
             "exhaustiveness": exhaustiveness
         })

@@ -133,8 +133,10 @@ def get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5):
 config = load_config()
 
 lib_name = config.get("library_name", '')
-TARGET_FILE = f"data/results/docking_report_target_{lib_name}.csv"
-REF_FILE = f"data/results/docking_report_reference_{lib_name}.csv"
+RUN_NAME = config.get("run_name", 'default_run')
+TARGET_FILE = f"data/results/docking_report_target_{lib_name}_{RUN_NAME}.csv"
+REF_FILE = f"data/results/docking_report_reference_{lib_name}_{RUN_NAME}.csv"
+
 
 @st.cache_data
 def load_summary_data(target_path, ref_path):
@@ -202,7 +204,7 @@ def load_summary_data(target_path, ref_path):
     
     # for idx, row in df.iterrows():
     #     ligand_id = row['Ligand']
-    #     ligand_pdbqt = f"data/results/target/poses/{ligand_id}_docked.pdbqt"
+    #     ligand_pdbqt = f"data/results/target/{RUN_NAME}/poses/{ligand_id}_docked.pdbqt"
         
     #     if os.path.exists(receptor_pdbqt) and os.path.exists(ligand_pdbqt):
     #         residues = get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5)
@@ -258,8 +260,9 @@ def load_summary_data(target_path, ref_path):
     # include mmpbsa results
     results_files = glob.glob("data/results/mmpbsa/*/FINAL_RESULTS_MMPBSA.dat")
 
+    mmpbsa_data = []
+
     if results_files:
-        mmpbsa_data = []
         for f in results_files:
             try:
                 with open(f) as txt:
@@ -642,9 +645,9 @@ if selected_rows is not None and len(selected_rows) > 0:
             st.markdown("**Specificity:** N/A")
 
         # --- LAZY POCKET RESIDUE CALCULATION ---
-        st.markdown(f"**Pocket Residues:**")
+        st.markdown(f"**Interacting Residues:**")
         receptor_path = "data/interim/target_prep.pdbqt"
-        ligand_path = f"data/results/target/poses/{ligand_id}_docked.pdbqt"
+        ligand_path = f"data/results/target/{RUN_NAME}/poses/{ligand_id}_docked.pdbqt"
         
         if os.path.exists(receptor_path) and os.path.exists(ligand_path):
             with st.spinner("Analyzing interactions..."):

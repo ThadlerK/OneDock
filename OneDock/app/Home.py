@@ -12,9 +12,9 @@ import time
 
 st.set_page_config(
     page_title = "OneDock",
-    page_icon = "app/images/logo_protein.png"
+    page_icon = "app/images/logo_protein.png",
+    layout="wide"
 )
-
 st.image("app/images/logo_dunkel.png")
 st.markdown("<p style='text-align: center; font-weight: bold; font-size: 16px;'>The easiest way to find the most promising Ligands for your Protein</p>", 
             unsafe_allow_html = True)
