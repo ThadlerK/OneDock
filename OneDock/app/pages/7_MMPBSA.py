@@ -9,6 +9,19 @@ import time
 
 st.set_page_config(page_title="MMPBSA Analysis", layout="wide")
 st.title("MMPBSA Rescoring")
+st.info("""
+            **MM/GBSA** (Molecular Mechanics / Generalized Born Surface Area) is an end-point free energy method used 
+            to estimate binding free energies from molecular dynamics trajectories. It combines molecular mechanics 
+            energy terms (electrostatics and van der Waals interactions) with an implicit solvent model based on 
+            Generalized Born theory and a nonpolar surface area contribution.  \n
+
+            **OpenMM** is an open-source, high-performance molecular simulation toolkit designed for running 
+            molecular dynamics (MD) simulations, with native support for GPU acceleration. \n
+            
+            Reference: An Efficient Program for End-State Free Energy Calculations
+            Bill R. Miller III, T. Dwight McGee Jr., Jason M. Swails, Nadine Homeyer, Holger Gohlke, and Adrian E. Roitberg
+            Journal of Chemical Theory and Computation 2012 8 (9), 3314-3321
+            """)
 
 os.makedirs("logs", exist_ok=True)
 
