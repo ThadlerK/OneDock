@@ -195,7 +195,7 @@ else:
 
             # 2. Build Targets List
             targets = []
-            for lig in top_ligands:
+            for lig in final_selection:
                 for r in range(1, ranks_per_ligand + 1):
                     targets.append(f"data/results/mmpbsa/{lig}_rank{r}/FINAL_RESULTS_MMPBSA.dat")
 

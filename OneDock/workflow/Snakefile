@@ -3,7 +3,7 @@
 configfile: "config/config.yaml"
 
 # Get the current Library Name (defaults to 'library' if missing)
-TARGET_LIB = config.get("library_name")
+TARGET_LIB = config.get("library_name", "")
 
 # Run name
 RUN_NAME = config.get("run_name", "default_run")
@@ -50,7 +50,7 @@ def get_docking_residues(wildcards):
 
 rule all:
     input:
-        expand(f"data/results/docking_report_{type}_{TARGET_LIB}_{RUN_NAME}.csv", type=DOCKING_TARGETS)
+        expand(f"data/results/docking_report_{{type}}_{TARGET_LIB}_{RUN_NAME}.csv", type=DOCKING_TARGETS)
 
 # Structure Preparation
 rule prepare_structure:
@@ -144,7 +144,7 @@ rule run_bioemu_generation:
 # 1. Prepare Ligand Reference (Antechamber needs a mol2)
 rule prep_lig_reference:
     input:
-        pdbqt = f"data/results/{{type}}/{RUN_NAME}/poses/{{id}}_docked.pdbqt"
+        pdbqt = f"data/results/target/{RUN_NAME}/poses/{{id}}_docked.pdbqt"
     output:
         mol2 = "data/interim/mmpbsa/{id}_ref.mol2"
     conda:
@@ -157,7 +157,7 @@ rule prep_lig_reference:
 rule build_complex_rank:
     input:
         target = "data/inputs/target.pdb", # Uses your raw input
-        ligand = f"data/results/{{type}}/{RUN_NAME}/poses/{{id}}_docked.pdbqt"
+        ligand = f"data/results/target/{RUN_NAME}/poses/{{id}}_docked.pdbqt"
     output:
         complex = "data/interim/mmpbsa/{id}_rank{rank}.pdb"
     conda:
