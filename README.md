@@ -14,7 +14,7 @@ If you want to find out which ligands might bind to your protein, you have come 
     </td>
     <td align = "center">
       <img src = "OneDock/app/images/unknown_sites.svg"><br>
-      <sub>Identify unknown binding sites</sub>
+      <sub>Identify <strong>unknown binding sites</strong></sub>
     </td>
     <td align = "center">
       <br>
@@ -30,10 +30,12 @@ If you want to find out which ligands might bind to your protein, you have come 
 
 
 
-This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline.<br>
+This Readme will take you through the workings of the pipeline. We'll show you what possibilities you have, how to use it on your own device, and what you need to consider when using the pipeline.
+<br>
+<br>
 
 ## How to find your way through the Pipeline 
-![Alt text](OneDock/app/images/pipeline.png)
+![Alt text](OneDock/app/images/pipeline.svg)
 
 As you can see, there are a lot of different possibilities, so let's walk through them. 
 
@@ -94,7 +96,11 @@ OneDock
 │   ├── scripts/              
 │   │   ├── bioemu_pipeline.py
 │   │   ├── convert_smi_to_bdbqt.py
-│   │   └── docking_script_with_residues.py
+│   │   ├── docking_script_with_residues.py
+│   │   ├── fix_atom_names.py
+│   │   ├── mmpbsa_worker.sh
+│   │   ├── run_openmm_md_old.py
+│   │   └── run_openmm_md.py
 │   └── Snakefile            # Main entry point for Snakemake
 └── .gitignore
 README.md
@@ -115,7 +121,9 @@ Once you are in your container you can start OneDock:
 streamlit run app/Home.py
 ```
 OneDock will guide you through the steps according to your wishes. 
-You will need GPU access to use the BioEmu and MMPSA tools.<br>
+You will need GPU access to use the BioEmu and MM/GBSA tools.<br>
+
+
 
 ### The Tools
 
@@ -138,27 +146,47 @@ The pipeline is organized in [snakemake](https://snakemake.github.io/). It allow
 We use a [docker](https://www.docker.com/) container to bundle all the dependencies of OneDock. All of the different libraries, system tools,... necessary to run it are defined in a dockerfile from which an image is built. This way, when you use the pipleine, you won't have to worry about installing everything. 
 
 #### **BioEmu**
-
+<p align = "center">
+<img src = "OneDock/app/images/bioemu.svg" width="15%"></p> 
+BioEmu is a generative structural modeling approach used to  sample  biomolecular conformations. In this project, BioEmu was used only to generate the  initial protein structures. No dynamics or free energy calculations were performed with BioEmu; it served exclusively as a tool for initial structure sampling.
 
 #### **fpocket**
+<p align = "center">
+<img src = "OneDock/app/images/fpocket.svg" width="20%"></p> 
 fpocket is a pocket detection tool  based on geometric methods such as Voronoi tessellation and α-spheres to identify surface cavities efficiently. It clusters these geometric features into pockets and scores them to estimate properties like druggability and pocket volume <sup>2</sup>.
 
 #### **P2Rank**
+<p align = "center">
+<img src = "OneDock/app/images/p2rank.svg" width="20%"></p> 
 P2Rank is a pocket detection tool that samples points on the protein’s solvent‑accessible surface and assigns each a ligandability score using a random forest model trained on known protein–ligand complexes. Points with high ligandability are clustered into pockets, which are then  scored and ranked by combining the scores of their points <sup>3</sup>.
 
 #### **AutoDock Vina**
+<p align = "center">
+<img src = "OneDock/app/images/vina.svg" width="10%"></p> 
 AutoDock Vina is a fast molecular docking tool that predicts binding poses and binding affinities of small molecules to protein targets. It explores a user-defined binding site, generates multiple ligand poses, and scores them using an empirical scoring function <sup>4</sup>.
 
 #### **SwissADME**
+<p align = "center">
+<img src = "OneDock/app/images/adme.svg" width="20%"></p> 
 SwissADME is a web-based tool that uses a variety of predictive models to compute physicochemical descriptors of small molecules from their structure. Thereby it predicts ADME properties, drug-likeness, pharmacokinetics and medicinal chemistry features <sup>5</sup>.
 
 #### **PoseBusters**
-PoseBusters is a Python toolkit that validates the physical and chemical plausibility of protein-ligand complexes <sup>6</sup>.
+<p align = "center">
+<img src = "OneDock/app/images/posebusters.svg" width="10%"></p> 
+PoseBusters is a Python toolkit that validates the physical and chemical plausibility of protein-ligand complexes <sup>7</sup>.
 
 #### **py3Dmol** 
-py3Dmol is a python toolkit that enables an interactive 3D visualization of protein-ligand complexes <sup>6</sup>.
+py3Dmol is a python toolkit that enables an interactive 3D visualization of protein-ligand complexes <sup>8</sup>.
 
-#### **MMPBSA**
+
+#### **OpenMM**
+<p align = "center">
+<img src = "OneDock/app/images/openmm.svg" width="12%"></p> 
+OpenMM is an open-source, high-performance molecular simulation toolkit designed for running molecular dynamics (MD) simulations, with native support for GPU acceleration. It provides implementations of modern force fields and integrators and allows flexible scripting of simulation protocols in Python.
+**Setup:** Protein - Ligand complexes were parameterized with the AMBER ff14SB force field for the protein and GAFF2 for the ligand (ligand parameters generated with Antechamber and missing terms via Parmchk2). Molecular dynamics simulations were carried out in OpenMM using an implicit solvent Generalized Born OBC2 model, including energy minimization followed by heating, equilibration, and production runs with gradually released backbone restraints. Trajectories from production were post-processed with MMPBSA.py using the GBSA model to estimate binding energies from snapshots<sup>9</sup>.
+
+#### **MM/GBSA** 
+MM/GBSA (Molecular Mechanics / Generalized Born Surface Area) is an end-point free energy method used to estimate binding free energies from molecular dynamics trajectories. It combines molecular mechanics energy terms (electrostatics and van der Waals interactions) with an implicit solvent model based on Generalized Born theory and a nonpolar surface area contribution. MM/GBSA is closely related to MM/PBSA, which instead uses a numerical Poisson–Boltzmann solver for the polar solvation energy. While MM/PBSA can be more detailed, it is also significantly more computationally demanding and sensitive to numerical settings. We chose MM/GBSA because it is faster, more robust, and well suited for screening and ranking many protein-ligand complexes.
 
 
 <br>
@@ -166,7 +194,7 @@ py3Dmol is a python toolkit that enables an interactive 3D visualization of prot
 
 
 ### References
-1. *BioEmu Reference*
+1. Lewis, S., Hempel, T., Jiménez-Luna, J., Gastegger, M., Xie, Y., Foong, A. Y., ... & Noé, F. (2025). Scalable emulation of protein equilibrium ensembles with generative deep learning. Science, 389(6761), eadv9817.
 
 2. Le Guilloux, V., Schmidtke, P., & Tuffery, P. (2009). Fpocket: an open source platform for ligand pocket detection. BMC bioinformatics, 10(1), 168.
 
@@ -183,7 +211,10 @@ Chem. Sci. 15, 3130-3139 (2024)
 7. Rego, N. and Koes, D. 3Dmol.js: molecular visualization with WebGL. 
 Bioinformatics 31, 1322-1324 (2015)
 
-8. *MMPBSA reference*
+8. An Efficient Program for End-State Free Energy Calculations
+Bill R. Miller III, T. Dwight McGee Jr., Jason M. Swails, Nadine Homeyer, Holger Gohlke, and Adrian E. Roitberg Journal of Chemical Theory and Computation 2012 8 (9), 3314-3321
+
+9.  P. Eastman, R. Galvelis, R. P. Peláez, C. R. A. Abreu, S. E. Farr, E. Gallicchio, A. Gorenko, M. M. Henry, F. Hu, J. Huang, A. Krämer, J. Michel, J. A. Mitchell, V. S. Pande, J. PGLM Rodrigues, J. Rodriguez-Guerra, A. C. Simmonett, S. Singh, J. Swails, P. Turner, Y. Wang, I. Zhang, J. D. Chodera, G. De Fabritiis, and T. E. Markland. “OpenMM 8: Molecular Dynamics Simulation with Machine Learning Potentials.” J. Phys. Chem. B 128(1), pp. 109-116 (2023).
 
 
 <br>
