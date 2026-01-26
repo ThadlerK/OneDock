@@ -281,8 +281,8 @@ with col1:
                                      help="Highlights residues within 3.5Å of the ligand in yellow-green")
 with col2:
     show_docking_box = st.checkbox("Show Docking Box", value=False)
-    show_pocket_residues = st.checkbox("Show Binding Pocket", value=True,
-                                        help="Shows defined pocket residues in cyan")
+    show_pocket_residues = st.checkbox("Show User-defined Binding Pocket", value=True,
+                                        help="Shows user-defined pocket residues in cyan")
 
 interaction_distance = 3.5
 
