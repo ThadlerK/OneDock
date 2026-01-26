@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import glob
 import os
+import requests
+import urllib.parse
+import time
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from rdkit import Chem
 from rdkit.Chem import Draw
+from utils import load_config
 
 st.set_page_config(layout="wide", page_title="Summary Report")
 
@@ -16,6 +21,56 @@ if st.button("Reload Data"):
     st.rerun()
 
 # --- HELPER FUNCTIONS ---
+@st.cache_data
+def fetch_pubchem_data(smiles):
+    """
+    Queries PubChem ONCE to get Common Name, IUPAC, Description, and Link.
+    Returns a dictionary or None.
+    """
+    if not smiles or len(str(smiles)) < 2: 
+        return None
+
+    data = {
+        "CommonName": None,
+        "IUPAC": None,
+        "Description": None,
+        "Link": None
+    }
+
+    try:
+        encoded_smiles = urllib.parse.quote(smiles)
+        base_url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
+        
+        # 1. Get CID (Compound ID)
+        url_cid = f"{base_url}/compound/smiles/{encoded_smiles}/cids/JSON"
+        resp = requests.get(url_cid, timeout=2)
+        if resp.status_code != 200:
+            return None
+        
+        cid = resp.json()['IdentifierList']['CID'][0]
+        data["Link"] = f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}"
+
+        # 2. Get Properties (Title, IUPAC Name) in ONE call
+        url_props = f"{base_url}/compound/cid/{cid}/property/Title,IUPACName/JSON"
+        resp_props = requests.get(url_props, timeout=2)
+        if resp_props.status_code == 200:
+            props = resp_props.json()['PropertyTable']['Properties'][0]
+            data["CommonName"] = props.get('Title', f"CID: {cid}")
+            data["IUPAC"] = props.get('IUPACName')
+
+        # 3. Get Description (Separate call usually required)
+        url_desc = f"{base_url}/compound/cid/{cid}/description/JSON"
+        resp_desc = requests.get(url_desc, timeout=2)
+        if resp_desc.status_code == 200:
+            desc_data = resp_desc.json()
+            if 'InformationList' in desc_data and 'Information' in desc_data['InformationList']:
+                # Get the first available description
+                data["Description"] = desc_data['InformationList']['Information'][0].get('Description')
+
+        return data
+            
+    except Exception:
+        return None
 
 def get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5):
     """Extract residues within cutoff distance from docked ligand"""
@@ -75,8 +130,11 @@ def get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5):
         return f"Error: {str(e)}"
 
 # --- LOAD DATA ---
-TARGET_FILE = "data/results/docking_report_target.csv"
-REF_FILE = "data/results/docking_report_reference.csv"
+config = load_config()
+
+lib_name = config.get("library_name", '')
+TARGET_FILE = f"data/results/docking_report_target_{lib_name}.csv"
+REF_FILE = f"data/results/docking_report_reference_{lib_name}.csv"
 
 @st.cache_data
 def load_summary_data(target_path, ref_path):
@@ -138,21 +196,21 @@ def load_summary_data(target_path, ref_path):
         
         df = df.merge(adme_df, left_on='Ligand', right_on=merge_key, how='left')
     
-    # Calculate pocket residues for each ligand
-    receptor_pdbqt = "data/interim/target_prep.pdbqt"
-    pocket_residues_list = []
+    # # Calculate pocket residues for each ligand
+    # receptor_pdbqt = "data/interim/target_prep.pdbqt"
+    # pocket_residues_list = []
     
-    for idx, row in df.iterrows():
-        ligand_id = row['Ligand']
-        ligand_pdbqt = f"data/results/target/poses/{ligand_id}_docked.pdbqt"
+    # for idx, row in df.iterrows():
+    #     ligand_id = row['Ligand']
+    #     ligand_pdbqt = f"data/results/target/poses/{ligand_id}_docked.pdbqt"
         
-        if os.path.exists(receptor_pdbqt) and os.path.exists(ligand_pdbqt):
-            residues = get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5)
-            pocket_residues_list.append(residues)
-        else:
-            pocket_residues_list.append("N/A")
+    #     if os.path.exists(receptor_pdbqt) and os.path.exists(ligand_pdbqt):
+    #         residues = get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5)
+    #         pocket_residues_list.append(residues)
+    #     else:
+    #         pocket_residues_list.append("N/A")
     
-    df['Pocket_Residues'] = pocket_residues_list
+    # df['Pocket_Residues'] = pocket_residues_list
     
     # Load PoseBusters results if available
     pb_results_file = "data/results/posebusters/posebusters_validation.csv"
@@ -196,6 +254,42 @@ def load_summary_data(target_path, ref_path):
             ro5_status_list.append('N/A')
     
     df['Lipinski_RO5'] = ro5_status_list
+
+    # include mmpbsa results
+    results_files = glob.glob("data/results/mmpbsa/*/FINAL_RESULTS_MMPBSA.dat")
+
+    if results_files:
+        mmpbsa_data = []
+        for f in results_files:
+            try:
+                with open(f) as txt:
+                    content = txt.read()
+                    for line in content.splitlines():
+                        if line.startswith("DELTA TOTAL"):
+                            val = float(line.split()[2])
+                            parts = f.split("/")
+                            # Extract folder name: {lig}_rank{r}
+                            folder = parts[-2]
+                            lig_id = folder.split("_rank")[0]
+                            rank_id = folder.split("_rank")[1]
+                            
+                            mmpbsa_data.append({
+                                "Ligand": lig_id, 
+                                "Rank": rank_id, 
+                                "Delta G (MMPBSA)": val
+                            })
+                            break
+            except:
+                pass
+        
+    if mmpbsa_data and df is not None:
+        df_mmpbsa = pd.DataFrame(mmpbsa_data)
+        # B. Handle multiple ranks (Optional but recommended)
+        df_mmpbsa_best = df_mmpbsa.sort_values("Delta G (MMPBSA)").groupby("Ligand").first().reset_index()
+
+        # C. Merge into main dataframe
+        df = df.merge(df_mmpbsa_best[['Ligand', 'Delta G (MMPBSA)']], on='Ligand', how='left')
+                    
     
     # Sort by affinity (best first)
     df = df.sort_values('Affinity_Target', ascending=True)
@@ -404,7 +498,7 @@ if (('Lipinski RO5' in df.columns) or ('Lipinski_RO5' in df.columns)) and lipins
 st.subheader("Summary Table")
 
 # Prepare display dataframe - base columns
-display_columns = ['Ligand', 'Affinity_Target', 'Specificity', 'Rank_Gain', 'Pocket_Residues']
+display_columns = ['Ligand', 'Affinity_Target', 'Specificity', 'Rank_Gain']
 
 # Add optional columns
 if 'PoseBusters_Score' in df.columns:
@@ -422,6 +516,8 @@ for col in adme_cols:
 # Add SMILES at the end
 if 'Smiles' in df.columns:
     display_columns.append('Smiles')
+if 'Delta G (MMPBSA)' in df.columns:
+    display_columns.append('Delta G (MMPBSA)')
 
 df_display = df[display_columns].copy()
 
@@ -457,7 +553,7 @@ gb.configure_column("Target (kcal/mol)", width=150, type=["numericColumn", "numb
 gb.configure_column("Specificity", width=120, type=["numericColumn", "numberColumnFilter"])
 if 'Rank Gain' in df_display.columns:
     gb.configure_column("Rank Gain", width=120, type=["numericColumn", "numberColumnFilter"])
-gb.configure_column("Pocket Residues", width=400, wrapText=True, autoHeight=True)
+# gb.configure_column("Pocket Residues", width=400, wrapText=True, autoHeight=True)
 
 if 'PoseBusters (%)' in df_display.columns:
     gb.configure_column("PoseBusters (%)", width=130, type=["numericColumn", "numberColumnFilter"])
@@ -504,6 +600,7 @@ selected_rows = grid_response['selected_rows']
 if selected_rows is not None and len(selected_rows) > 0:
     st.subheader("Structure Preview")
     
+    # Handle AgGrid return format (sometimes list, sometimes DataFrame)
     selected_row = selected_rows.iloc[0] if hasattr(selected_rows, 'iloc') else selected_rows[0]
     ligand_id = selected_row['Ligand']
     
@@ -511,74 +608,56 @@ if selected_rows is not None and len(selected_rows) > 0:
     
     with col1:
         st.markdown(f"**Ligand:** {ligand_id}")
+        
+        # --- SINGLE API CALL ---
+        if 'Smiles' in selected_row and selected_row['Smiles']:
+            # Fetch all data (Name, Link, IUPAC, Desc) in one go
+            pc_data = fetch_pubchem_data(selected_row['Smiles'])
+            
+            if pc_data and pc_data['CommonName']:
+                st.markdown(f"### {pc_data['CommonName']}")
+                if pc_data['Link']:
+                    st.markdown(f"🔗 [View on PubChem]({pc_data['Link']})")
+                
+                if pc_data['IUPAC']:
+                    with st.expander("IUPAC Name"):
+                        st.text(pc_data['IUPAC'])
+                
+                if pc_data['Description']:
+                    with st.expander("Description"):
+                        st.caption(pc_data['Description'])
+            else:
+                st.caption("No additional data found in PubChem.")
+                
+            # Show SMILES in expander to save space
+            with st.expander("Show SMILES"):
+                st.code(selected_row['Smiles'])
+
+        # --- METRICS ---
         st.markdown(f"**Target Affinity:** {selected_row['Target (kcal/mol)']} kcal/mol")
         
         if 'Specificity' in selected_row and selected_row['Specificity'] is not None:
             st.markdown(f"**Specificity:** {selected_row['Specificity']}")
         else:
-            st.markdown("**Specificity:** N/A (no reference)")
-        
-        # Display SMILES and PubChem link
-        if 'Smiles' in selected_row and selected_row['Smiles']:
-            smiles = selected_row['Smiles']
-            st.markdown(f"**SMILES:** `{smiles}`")
-            
-            # Try to fetch IUPAC name and description from PubChem
-            import urllib.parse
-            import requests
-            smiles_for_url = smiles.replace('+', '').replace('-', '')
-            
-            # Try to get IUPAC name and CID from PubChem API
-            iupac_name = None
-            cid = None
-            description = None
-            
-            try:
-                # Search for compound by SMILES to get CID and IUPAC name
-                search_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{urllib.parse.quote(smiles_for_url)}/property/IUPACName/JSON"
-                response = requests.get(search_url, timeout=3)
-                if response.status_code == 200:
-                    data = response.json()
-                    if 'PropertyTable' in data and 'Properties' in data['PropertyTable']:
-                        props = data['PropertyTable']['Properties'][0]
-                        iupac_name = props.get('IUPACName')
-                        cid = props.get('CID')
-                
-                # If we have a CID, try to get the description
-                if cid:
-                    desc_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/description/JSON"
-                    desc_response = requests.get(desc_url, timeout=3)
-                    if desc_response.status_code == 200:
-                        desc_data = desc_response.json()
-                        if 'InformationList' in desc_data and 'Information' in desc_data['InformationList']:
-                            descriptions = desc_data['InformationList']['Information']
-                            if descriptions and len(descriptions) > 0:
-                                description = descriptions[0].get('Description')
-            except:
-                pass
-            
-            # Display IUPAC name if found
-            if iupac_name:
-                st.markdown(f"**IUPAC Name:** {iupac_name}")
-            
-            # Display description if found
-            if description:
-                st.markdown(f"**Description:** {description}")
-            
-            # Create PubChem search link
-            smiles_encoded = urllib.parse.quote(smiles_for_url)
-            pubchem_url = f"https://pubchem.ncbi.nlm.nih.gov/#query={smiles_encoded}"
-            st.markdown(f"[Search on PubChem]({pubchem_url}) for further information")
-        
+            st.markdown("**Specificity:** N/A")
+
+        # --- LAZY POCKET RESIDUE CALCULATION ---
         st.markdown(f"**Pocket Residues:**")
-        st.text(selected_row['Pocket Residues'])
+        receptor_path = "data/interim/target_prep.pdbqt"
+        ligand_path = f"data/results/target/poses/{ligand_id}_docked.pdbqt"
         
-        # Add button to open in 3D Viewer
+        if os.path.exists(receptor_path) and os.path.exists(ligand_path):
+            with st.spinner("Analyzing interactions..."):
+                residues = get_pocket_residues_from_pose(receptor_path, ligand_path, cutoff=3.5)
+                st.info(residues)
+        else:
+            st.warning("Structure files not found.")
+        
+        # --- 3D VIEWER BUTTON ---
         st.markdown("")
         if st.button("Open in 3D Viewer", type="primary", key="open_3d_viewer"):
-            # Store the selected ligand in session state for py3Dmol to use
             st.session_state.py3dmol_preselected_ligand = ligand_id
-            st.switch_page("pages/6_py3Dmol.py")
+            st.switch_page("pages/6_py3Dmol Visualization.py") # Ensure filename matches exactly
     
     with col2:
         if 'Smiles' in selected_row and selected_row['Smiles']:
@@ -588,11 +667,12 @@ if selected_rows is not None and len(selected_rows) > 0:
                     img = Draw.MolToImage(mol, size=(400, 300))
                     st.image(img, caption=f"Structure of {ligand_id}")
                 else:
-                    st.error("Could not generate structure from SMILES")
-            except Exception as e:
-                st.error(f"Error generating structure: {e}")
+                    st.error("Invalid SMILES")
+            except Exception:
+                st.error("Could not render structure.")
         else:
-            st.info("No SMILES data available for structure preview")
+            st.info("No SMILES data available.")
+
 
 # --- DOWNLOAD BUTTON ---
 csv_data = df_display.to_csv(index=False).encode('utf-8')

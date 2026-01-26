@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
-from utils import run_posebusters_validation, convert_pdbqt_to_pdb
+from utils import run_posebusters_validation, convert_pdbqt_to_pdb, load_config
 
 st.set_page_config(page_title = "PoseBusters")
 st.title("PoseBusters Validation")
@@ -28,7 +28,10 @@ Chem. Sci. 15, 3130-3139 (2024)
 """)
 
 # Check if docking results exist
-result_file = "data/results/docking_report_target.csv"
+config = load_config()
+
+lib_name = config.get("library_name", '')
+result_file = f"data/results/docking_report_target_{lib_name}.csv"
 poses_dir = "data/results/target/poses"
 
 if not os.path.exists(result_file):
@@ -41,7 +44,7 @@ if not os.path.exists(result_file):
 df = pd.read_csv(result_file)
 
 # Load reference results if available for specificity and rank gain calculation
-ref_file = "data/results/docking_report_reference.csv"
+ref_file = f"data/results/docking_report_reference_{lib_name}.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     

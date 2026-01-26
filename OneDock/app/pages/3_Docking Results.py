@@ -5,12 +5,16 @@ import os
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 from rdkit import Chem
 from rdkit.Chem import Draw
+from utils import load_config
 
 st.set_page_config(layout="wide", page_title="Docking Results")
 
 # --- KONFIGURATION ---
-TARGET_FILE = "data/results/docking_report_target.csv"
-REF_FILE = "data/results/docking_report_reference.csv"
+config = load_config()
+
+lib_name = config.get("library_name", '')
+TARGET_FILE = f"data/results/docking_report_target_{lib_name}.csv"
+REF_FILE = f"data/results/docking_report_reference_{lib_name}.csv"
 
 st.title("Results")
 
@@ -75,13 +79,13 @@ with st.expander("Analysis Charts", expanded=True):
                 chart_scatter = alt.Chart(df).mark_circle(size=60).encode(
                     x=alt.X('Affinity_Ref', title='Ref Affinity (kcal/mol)'),
                     y=alt.Y('Affinity_Target', title='Target Affinity (kcal/mol)'),
-                    color=alt.Color('Delta_Affinity', scale=alt.Scale(scheme='redblue', reverse=True), title='Specificity'),
+                    color=alt.Color('Delta_Affinity', scale=alt.Scale(scheme='viridis', reverse=True), title='Specificity'),
                     tooltip=['Ligand', 'Affinity_Target', 'Affinity_Ref', 'Delta_Affinity']
                 ).interactive()
                 st.altair_chart(chart_scatter, use_container_width=True)
 
             with col_chart2:
-                st.markdown("**Rank Comparison** (Top Left = Rank Improvement)")
+                st.markdown("**Rank Comparison** (Lower Right = Best Ranks)")
                 chart_rank = alt.Chart(df).mark_circle(size=60).encode(
                     x=alt.X('Rank_Ref', title='Rank on Reference'),
                     y=alt.Y('Rank_Target', title='Rank on Target'),

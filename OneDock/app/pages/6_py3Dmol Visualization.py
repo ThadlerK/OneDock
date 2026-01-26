@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
-from utils import create_py3dmol_visualization, convert_pdbqt_to_pdb, analyze_protein_ligand_interactions
+from utils import create_py3dmol_visualization, convert_pdbqt_to_pdb, analyze_protein_ligand_interactions, load_config, calculate_box_from_residues
+
 
 st.set_page_config(page_title = "py3Dmol Visualization")
 st.title("3D Molecular Visualization with py3Dmol")
@@ -20,7 +21,10 @@ Bioinformatics 31, 1322-1324 (2015)
 """)
 
 # Check if docking results exist
-result_file = "data/results/docking_report_target.csv"
+config = load_config()
+
+lib_name = config.get("library_name", '')
+result_file = f"data/results/docking_report_target_{lib_name}.csv"
 poses_dir = "data/results/target/poses"
 receptor_file = "data/interim/target_prep.pdbqt"
 
@@ -33,8 +37,8 @@ if not os.path.exists(result_file):
 # Load docking results
 df = pd.read_csv(result_file)
 
-# Load reference results if available for specificity and rank gain calculation
-ref_file = "data/results/docking_report_reference.csv"
+# Load reference results if available for specificity calculation
+ref_file = f"data/results/docking_report_reference_{lib_name}.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     
@@ -317,7 +321,6 @@ if st.button("Generate 3D Visualization", type="primary"):
     # Create visualization
     with st.spinner("Generating 3D visualization..."):
         # Load pocket residues from config
-        from utils import load_config, calculate_box_from_residues
         config = load_config()
         pocket_residues_str = config.get('pocket_residues', '')
         pocket_residues = [int(r.strip()) for r in pocket_residues_str.split(',') if r.strip().isdigit()] if pocket_residues_str else None

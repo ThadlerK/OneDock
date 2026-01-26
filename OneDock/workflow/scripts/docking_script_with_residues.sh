@@ -9,6 +9,8 @@ OUTPUT_LOG="$5"
 OUTPUT_SUMMARY="$6"
 GRID_SIZE="${7:-20}"    # Default to 20 if not set
 EXHAUSTIVENESS="${8:-8}" # Default to 8 if not set
+POCKET_MODE="${9:-unknown}"      # e.g., "Manual" or "Automatic"
+STRUCTURE_MODE="${10:-unknown}"  # e.g., "Reference" or "Blind"
 
 echo "========================================"
 echo "STARTING SINGLE DOCKING RUN"
@@ -21,6 +23,28 @@ echo "========================================"
 mkdir -p "$(dirname "$OUTPUT_DOCKED")"
 mkdir -p "$(dirname "$OUTPUT_LOG")"
 mkdir -p "$(dirname "$OUTPUT_SUMMARY")"
+
+# --- CHECK FOR EMPTY LIGAND (FAILED PREP) ---
+if [ ! -s "$LIGAND_PDBQT" ]; then
+    echo "Ligand file is empty (Preparation Failed). Skipping docking."
+    
+    # 1. Create a dummy docked file (empty) to satisfy Snakemake
+    touch "$OUTPUT_DOCKED"
+    
+    # 2. Create a dummy log explaining why
+    echo "Docking skipped due to empty ligand input." > "$OUTPUT_LOG"
+    
+    # 3. Create a placeholder summary so your results table doesn't break
+    REC_NAME=$(basename "$RECEPTOR_PDBQT" .pdbqt)
+    LIG_NAME=$(basename "$LIGAND_PDBQT" .pdbqt)
+    
+    # Write header and a 'NaN' row
+    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles,Grid_Size,Exhaustiveness,Pocket_Mode,Structure_Mode" > "$OUTPUT_SUMMARY"
+    echo "$REC_NAME,$LIG_NAME,NaN,skipped,$GRID_SIZE,$EXHAUSTIVENESS,$POCKET_MODE,$STRUCTURE_MODE" >> "$OUTPUT_SUMMARY"
+    
+    # Exit cleanly so the pipeline continues
+    exit 0
+fi
 
 # --- 1. CALCULATE POCKET CENTER FROM RESIDUES ---
 # We use a quick inline Python script to parse the PDBQT and find the center of mass of the selected residues.
@@ -102,6 +126,7 @@ vina \
     --center_x $CENTER_X --center_y $CENTER_Y --center_z $CENTER_Z \
     --size_x $GRID_SIZE --size_y $GRID_SIZE --size_z $GRID_SIZE \
     --exhaustiveness $EXHAUSTIVENESS \
+    --cpu 1 \
     --out "$OUTPUT_DOCKED" \
     > "$OUTPUT_LOG" 2>&1
 
@@ -129,8 +154,8 @@ if [ -f "$OUTPUT_LOG" ]; then
         SMILES="unknown"
     fi
     
-    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > "$OUTPUT_SUMMARY"
-    echo "$REC_NAME,$LIG_NAME,$AFFINITY,$SMILES" >> "$OUTPUT_SUMMARY"
+    echo "Receptor,Ligand,Affinity_kcal_mol,Smiles,Grid_Size,Exhaustiveness,Pocket_Mode,Structure_Mode" > "$OUTPUT_SUMMARY"
+    echo "$REC_NAME,$LIG_NAME,$AFFINITY,$SMILES,$GRID_SIZE,$EXHAUSTIVENESS,$POCKET_MODE,$STRUCTURE_MODE" >> "$OUTPUT_SUMMARY"
     
     echo "Docking Complete. Best Affinity: $AFFINITY"
 else

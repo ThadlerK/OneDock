@@ -5,6 +5,8 @@ import shutil
 import os
 import signal
 import time
+import re
+from utils import save_config
 
 st.set_page_config(page_title = "Docking")
 
@@ -65,7 +67,7 @@ job_running = is_job_running()
 
 # If the job was running but the PID is gone now, it finished (success or fail)
 if os.path.exists(PID_FILE) and not job_running:
-    # Read the final log to guess status (or use Snakemake exit codes if we wrapped it)
+    # Read the final log to guess status
     log_tail = get_log_content()
     cleanup_job() # Reset for next run
     
@@ -83,9 +85,33 @@ if job_running:
     st.info("Docking pipeline is running in the background...")
     st.caption("You can close this tab or VS Code. The job will continue.")
     
-    # Auto-refresh the page every 10 seconds to check status
-    st.empty() # Placeholder
-    time.sleep(1) # Small delay
+    # --- NEW: PROGRESS BAR LOGIC ---
+    progress_val = 0
+    progress_text = "Initializing docking..."
+    
+    # We read the log to find the percentage
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "r") as f:
+            log_content = f.read()
+            # Regex: find all digits followed by '%' (e.g., 50%)
+            matches = re.findall(r"([\d\.]+)%", log_content)
+            
+            if matches:
+                # Take the last occurrence and convert to float
+                try:
+                    last_pct = float(matches[-1])
+                    progress_val = min(last_pct, 100.0)
+                    progress_text = f"Docking Progress: {progress_val:.1f}%"
+                except ValueError:
+                    pass
+    
+    # Render the bar
+    st.progress(progress_val / 100, text=progress_text)
+    # -------------------------------
+    
+    # Auto-refresh the page every 2 seconds
+    st.empty() 
+    time.sleep(2) 
     if st.button("Refresh Status"):
         st.rerun()
 
@@ -106,8 +132,80 @@ if job_running:
 # 3. DISPLAY LAUNCH BUTTON (INPUT MODE)
 else:
     st.subheader("Pipeline Execution")
+
+    input_dir = "data/inputs/library_split"
+    available_libs = set()
+    
+    if os.path.exists(input_dir):
+        files = os.listdir(input_dir)
+        for f in files:
+            if f.endswith(".smi"):
+                # Extract prefix (e.g. "Chembl" from "Chembl_0001.smi")
+                # We assume format is Name_Number.smi
+                match = re.match(r"(.+)_\d+\.smi", f)
+                if match:
+                    available_libs.add(match.group(1))
+    
+    # Sort and create dropdown
+    lib_list = sorted(list(available_libs))
+    
+    if not lib_list:
+        st.error("No ligand libraries found! Please go to Ligand Prep page.")
+        st.stop()
+        
+    # Get current selection from config if it exists
+    current_lib = lib_list[0]
+    if os.path.exists("config/config.yaml"):
+        with open("config/config.yaml") as f:
+            c = yaml.safe_load(f) or {}
+            if c.get("library_name") in lib_list:
+                current_lib = c.get("library_name")
+
+    selected_lib = st.selectbox(
+        "Select Ligand Library to Dock", 
+        lib_list, 
+        index=lib_list.index(current_lib)
+    )
+    
+    st.info(f"Selected library: **{selected_lib}**")
+    
+    # --- A. NEW: DOCKING SETTINGS ---
+    
+    if os.path.exists("config/config.yaml"):
+        with open("config/config.yaml", "r") as f:
+            existing_conf = yaml.safe_load(f) or {}
+            current_grid = existing_conf.get("grid_size", 20)
+            current_exhaust = existing_conf.get("exhaustiveness", 8)
+
+    with st.expander("Docking Parameters", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            # Box Size Input
+            grid_size = st.number_input(
+                "Box Size (Å)", 
+                min_value=10, 
+                max_value=30, 
+                value=int(current_grid),
+                help="Size of the cubic box centered on the pocket (default: 20Å)"
+            )
+        with col2:
+            # Exhaustiveness Input
+            exhaustiveness = st.number_input(
+                "Exhaustiveness", 
+                min_value=1, 
+                max_value=100, 
+                value=int(current_exhaust),
+                help="How hard Vina searches. Higher = slower but more accurate (default: 8)"
+            )
+            
+    # --------------------------------
     
     if st.button("Launch Docking Pipeline"):
+        save_config({
+            "grid_size": grid_size,
+            "exhaustiveness": exhaustiveness
+        })
+
         # --- A. Validation ---
         try:
             with open("config/config.yaml", "r") as f:
@@ -129,33 +227,33 @@ else:
             st.stop()
 
         # --- B. Cleanup Old Results ---
-        if os.path.exists("data/results"):
-            shutil.rmtree("data/results")
-            os.makedirs("data/results", exist_ok=True)
+        # Note: Be careful here. If you want to keep old results (different libraries),
+        # you might want to skip this delete or make it more targeted.
+        # if os.path.exists("data/results"):
+        #     shutil.rmtree("data/results")
+        #     os.makedirs("data/results", exist_ok=True)
+
+        num_cores = max(1, os.cpu_count() - 1)
             
         # --- C. Launch Background Process ---
-        # We redirect stdout/stderr to a file so we can read it later
         with open(LOG_FILE, "w") as log:
-            # Construct the command
             cmd = [
                 "snakemake",
-                "--cores", "1",
+                "--cores", str(num_cores),
                 "--configfile", "config/config.yaml",
                 "--rerun-incomplete",
-                "--keep-going" # Don't stop on first error
+                "--keep-going"
             ]
             
-            # Popen starts the process without waiting for it
             process = subprocess.Popen(
                 cmd,
                 stdout=log,
                 stderr=log,
-                start_new_session=True # CRITICAL: Detaches from the parent (Streamlit)
+                start_new_session=True 
             )
             
-            # Save the PID
             with open(PID_FILE, "w") as f:
                 f.write(str(process.pid))
                 
         st.success("Job started in background!")
-        st.rerun() # Reload page to switch to "Monitoring Mode"
+        st.rerun()

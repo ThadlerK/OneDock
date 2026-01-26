@@ -2,8 +2,15 @@
 
 configfile: "config/config.yaml"
 
+# Get the current Library Name (defaults to 'library' if missing)
+TARGET_LIB = config.get("library_name")
+
 # Get ligand IDs from the split library
-LIGAND_IDS, = glob_wildcards("data/inputs/library_split/{id}.smi")
+ALL_IDS, = glob_wildcards("data/inputs/library_split/{id}.smi")
+LIGAND_IDS = [x for x in ALL_IDS if x.startswith(TARGET_LIB + "_")]
+
+if not LIGAND_IDS:
+    raise ValueError(f"No ligands found matching library '{TARGET_LIB}' in data/inputs/library_split/")
 
 # Define what to run: always target, optionally reference
 DOCKING_TARGETS = ["target"]
@@ -42,7 +49,7 @@ def get_docking_residues(wildcards):
 
 rule all:
     input:
-        expand("data/results/docking_report_{type}.csv", type=DOCKING_TARGETS)
+        expand("data/results/docking_report_{type}_{lib}.csv", type=DOCKING_TARGETS, lib=TARGET_LIB)
 
 # Structure Preparation
 rule prepare_structure:
@@ -79,7 +86,9 @@ rule run_docking:
     params:
         residues = get_docking_residues,
         exhaustiveness = config.get("exhaustiveness", 8),
-        grid_size = config.get("grid_size", 20)
+        grid_size = config.get("grid_size", 20),
+        pocket_known = "pocket known" if config.get("pocket_known") else "pocket unknown",
+        structure_known = "structure known" if config.get("structure_known") else "structure unknown"
     shell:
         """
         bash workflow/scripts/docking_script_with_residues.sh \
@@ -90,7 +99,9 @@ rule run_docking:
             "{output.log}" \
             "{output.summary}" \
             "{params.grid_size}" \
-            "{params.exhaustiveness}"
+            "{params.exhaustiveness}" \
+            "{params.pocket_known}" \
+            "{params.structure_known}"
         """
 
 # Aggregation per Type
@@ -99,11 +110,11 @@ rule aggregate_results:
         # Double curly braces {{type}} allow the wildcard to pass through expand
         expand("data/results/{{type}}/stats/{id}.csv", id=LIGAND_IDS)
     output:
-        "data/results/docking_report_{type}.csv"
+        f"data/results/docking_report_{{type}}_{TARGET_LIB}.csv"
     shell:
         """
-        echo "Receptor,Ligand,Affinity_kcal_mol,Smiles" > {output}
-        # Concatenate all csvs, skipping the header line
+        echo "Receptor,Ligand,Affinity_kcal_mol,Smiles,Grid_Size,Exhaustiveness,Pocket_Mode,Structure_Mode" > {output}
+        # Concatenate content (skipping header lines of individual files)
         tail -n +2 -q {input} >> {output}
         """
 

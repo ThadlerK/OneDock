@@ -12,3 +12,4 @@ OneDock/config/config.yaml
 OneDock/leap.log
 OneDock/reference.frc
 **/logs
+**/backup
