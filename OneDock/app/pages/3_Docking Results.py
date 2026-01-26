@@ -85,7 +85,7 @@ with st.expander("Analysis Charts", expanded=True):
                 st.altair_chart(chart_scatter, use_container_width=True)
 
             with col_chart2:
-                st.markdown("**Rank Comparison** (Top Left = Rank Improvement)")
+                st.markdown("**Rank Comparison** (Lower Right = Best Ranks)")
                 chart_rank = alt.Chart(df).mark_circle(size=60).encode(
                     x=alt.X('Rank_Ref', title='Rank on Reference'),
                     y=alt.Y('Rank_Target', title='Rank on Target'),
