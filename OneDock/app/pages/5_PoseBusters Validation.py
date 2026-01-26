@@ -31,8 +31,9 @@ Chem. Sci. 15, 3130-3139 (2024)
 config = load_config()
 
 lib_name = config.get("library_name", '')
-result_file = f"data/results/docking_report_target_{lib_name}.csv"
-poses_dir = "data/results/target/poses"
+RUN_NAME = config.get("run_name", 'default_run')
+result_file = f"data/results/docking_report_target_{lib_name}_{RUN_NAME}.csv"
+poses_dir = f"data/results/target/{RUN_NAME}/poses"
 
 if not os.path.exists(result_file):
     st.warning("No docking results found. Please run the docking pipeline first.")
@@ -44,7 +45,7 @@ if not os.path.exists(result_file):
 df = pd.read_csv(result_file)
 
 # Load reference results if available for specificity and rank gain calculation
-ref_file = f"data/results/docking_report_reference_{lib_name}.csv"
+ref_file = f"data/results/docking_report_reference_{lib_name}_{RUN_NAME}.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     

@@ -1196,3 +1196,34 @@ if __name__ == "__main__":
     
     print(f"\nExample: Lipinski violations = {violations}")
 
+
+def get_available_run_names(library_name):
+    """
+    Scans the results folder for: docking_report_target_{library_name}_{RUN_NAME}.csv
+    Returns a list of found RUN_NAMEs.
+    """
+    # Build search pattern
+    search_pattern = f"data/results/docking_report_target_{library_name}_*.csv"
+    files = glob.glob(search_pattern)
+    
+    run_names = []
+    prefix = f"docking_report_target_{library_name}_"
+    
+    for f in files:
+        filename = os.path.basename(f)
+        # Verify structure to be safe
+        if filename.startswith(prefix) and filename.endswith(".csv"):
+            # Extract the middle part (the run ID)
+            # Example: docking_report_target_Chembl_G20_E8.csv
+            # We strip the prefix and the ".csv" suffix -> Remains "G20_E8"
+            run_id = filename[len(prefix):-4]
+            if run_id: # Ignore empty strings
+                run_names.append(run_id)
+    
+    # Optional: Check for the legacy file WITHOUT a run name (Default)
+    legacy_file = f"data/results/docking_report_target_{library_name}.csv"
+    if os.path.exists(legacy_file):
+        run_names.append("Default (No Run ID)")
+        
+    # Sort: Newest/Longest names first (often more informative)
+    return sorted(run_names, reverse=True)

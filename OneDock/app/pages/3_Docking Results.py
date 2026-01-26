@@ -13,8 +13,9 @@ st.set_page_config(layout="wide", page_title="Docking Results")
 config = load_config()
 
 lib_name = config.get("library_name", '')
-TARGET_FILE = f"data/results/docking_report_target_{lib_name}.csv"
-REF_FILE = f"data/results/docking_report_reference_{lib_name}.csv"
+RUN_NAME = config.get("run_name", 'default_run')
+TARGET_FILE = f"data/results/docking_report_target_{lib_name}_{RUN_NAME}.csv"
+REF_FILE = f"data/results/docking_report_reference_{lib_name}_{RUN_NAME}.csv"
 
 st.title("Results")
 
@@ -26,12 +27,14 @@ def load_data(target_path, ref_path):
     
     # Target laden
     df_t = pd.read_csv(target_path)
+    df_t = df_t.dropna(subset=["Affinity_kcal_mol"])
     df_t = df_t.rename(columns={"Affinity_kcal_mol": "Affinity_Target"})
     df_t["Rank_Target"] = df_t["Affinity_Target"].rank(method="min", ascending=True)
 
     # Referenz laden (falls vorhanden)
     if os.path.exists(ref_path):
         df_r = pd.read_csv(ref_path)
+        df_r = df_r.dropna(subset=["Affinity_kcal_mol"])
         df_r = df_r.rename(columns={"Affinity_kcal_mol": "Affinity_Ref"})
         df_r["Rank_Ref"] = df_r["Affinity_Ref"].rank(method="min", ascending=True)
         

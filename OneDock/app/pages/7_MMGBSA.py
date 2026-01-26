@@ -67,7 +67,8 @@ except:
     config = {}
 
 lib_name = config.get("library_name", "target")
-DOCKING_RESULTS = f"data/results/docking_report_target_{lib_name}.csv"
+RUN_NAME = config.get("run_name", 'default_run')
+DOCKING_RESULTS = f"data/results/docking_report_target_{lib_name}_{RUN_NAME}.csv"
 
 df = None # Initialisieren mit None
 if os.path.exists(DOCKING_RESULTS):
@@ -110,7 +111,7 @@ else:
         # 1. DELTA RANK BERECHNUNG (falls Referenz vorhanden)
         # Wir versuchen, die Datei basierend auf der Config zu finden
         ref_lib_name = config.get("library_name", "")
-        REF_FILE = f"data/results/docking_report_reference_{ref_lib_name}.csv"
+        REF_FILE = f"data/results/docking_report_reference_{lib_name}_{RUN_NAME}.csv"
         
         has_rank_metric = False
         
@@ -207,7 +208,7 @@ else:
 
             # 2. Build Targets List
             targets = []
-            for lig in top_ligands:
+            for lig in final_selection:
                 for r in range(1, ranks_per_ligand + 1):
                     targets.append(f"data/results/mmpbsa/{lig}_rank{r}/FINAL_RESULTS_MMPBSA.dat")
 

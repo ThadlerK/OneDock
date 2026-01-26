@@ -9,6 +9,8 @@ import argparse
 from pdbfixer import PDBFixer
 from openmm.app import PDBFile
 import torch
+import MDAnalysis as mda
+import glob
 
 # --- CONFIGURATION ---
 AA1_TO_3 = {
@@ -45,54 +47,86 @@ def run_bioemu(fasta_path, output_dir, num_samples=10):
         print(f"Error running BioEmu: {e}")
         exit(1)
 
-def convert_npz_to_pdb(npz_dir, pdb_out_dir):
-    """Converts BioEmu .npz files to CA-only PDB files."""
+def convert_npz_to_pdb(bioemu_workdir):
+    """
+    Converts BioEmu .npz samples to PDB files using the topology.pdb from the same run.
+    
+    Args:
+        bioemu_workdir (str): Path to the BioEmu output directory 
+                              (e.g., "data/interim/bioemu_workdir").
+    """
+    # 1. Define Paths
+    topology_path = os.path.join(bioemu_workdir, "ensembles", "topology.pdb")
+    npz_dir = os.path.join(bioemu_workdir, "ensembles")
+    pdb_out_dir = os.path.join(bioemu_workdir, "pdb_backbone")
+
     print(f"Converting NPZ to PDB in {pdb_out_dir}...")
     os.makedirs(pdb_out_dir, exist_ok=True)
+
+    # 2. Load Topology
+    if not os.path.exists(topology_path):
+        print(f"Error: Topology file not found at {topology_path}")
+        return []
+
+    try:
+        u = mda.Universe(topology_path)
+    except Exception as e:
+        print(f"Error loading MDAnalysis Universe: {e}")
+        return []
+
+    # 3. Select Atoms (N, CA, C, O)
+    # BioEmu outputs 4 backbone atoms per residue.
+    # We select exactly these to match the shape of the .npz data.
+    backbone = u.select_atoms("name N CA C O")
     
-    npz_files = sorted([f for f in os.listdir(npz_dir) if f.startswith("batch_") and f.endswith(".npz")])
+    print(f"Topology loaded: {len(u.residues)} residues, {backbone.n_atoms} backbone atoms.")
+
+    # 4. Find .npz files
+    npz_files = sorted(glob.glob(os.path.join(npz_dir, "batch_*.npz")))
     
     if not npz_files:
-        print("No .npz files found! Did BioEmu run correctly?")
+        print("No .npz files found.")
         return []
 
     generated_pdbs = []
     counter = 1
 
-    for npz_name in npz_files:
-        npz_path = os.path.join(npz_dir, npz_name)
-        data = np.load(npz_path, allow_pickle=True)
-
-        coords_all = data["pos"]
-        seq = data["sequence"]
-        
-        # Handle sequence format quirks
-        if isinstance(seq, np.ndarray): seq = seq.item()
-        if isinstance(seq, bytes): seq = seq.decode()
-
-        # Iterate through every sample in the batch
-        for coords in coords_all:
-            pdb_filename = f"sample_{counter:06d}.pdb"
-            pdb_path = os.path.join(pdb_out_dir, pdb_filename)
-
-            with open(pdb_path, "w") as f:
-                for i, (x, y, z) in enumerate(coords, start=1):
-                    # Safety check for sequence length mismatch
-                    if i > len(seq): break
-                    
-                    aa3 = AA1_TO_3.get(seq[i-1], "UNK")
-                    # Standard PDB Atom Line Format
-                    line = (
-                        f"ATOM  {i:5d}  CA  {aa3} A{i:4d}    "
-                        f"{x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00           C"
-                    )
-                    f.write(line + "\n")
-                f.write("END\n")
+    # 5. Iterate and Write
+    for npz_path in npz_files:
+        try:
+            data = np.load(npz_path, allow_pickle=True)
             
-            generated_pdbs.append(pdb_path)
-            counter += 1
+            # 'pos' shape is typically (Batch_Size, Num_Residues, 4, 3)
+            # We reshape it to (Batch_Size, Num_Atoms, 3) to match MDAnalysis
+            coords_batch = data["pos"]
             
-    print(f"Converted {len(generated_pdbs)} PDB files.")
+            for coords in coords_batch:
+                # Flatten: (Residues, 4, 3) -> (Total_Atoms, 3)
+                flat_coords = coords.reshape(-1, 3)
+                
+                # Safety Check
+                if len(flat_coords) != backbone.n_atoms:
+                    print(f"Shape mismatch in sample {counter}: "
+                          f"NPZ has {len(flat_coords)} atoms, Topology has {backbone.n_atoms}.")
+                    continue
+                
+                # Update positions in the Universe
+                backbone.positions = flat_coords
+                
+                # Write PDB
+                pdb_filename = f"sample_{counter:06d}.pdb"
+                out_path = os.path.join(pdb_out_dir, pdb_filename)
+                
+                # write_selection uses the atom names/resnames from topology.pdb
+                backbone.write(out_path)
+                
+                generated_pdbs.append(out_path)
+                counter += 1
+                
+        except Exception as e:
+            print(f"Error processing {npz_path}: {e}")
+
+    print(f"Successfully created {len(generated_pdbs)} PDB files in {pdb_out_dir}")
     return generated_pdbs
 
 def pick_random_structure(pdb_list, final_output_path):
@@ -144,32 +178,39 @@ def add_sidechains(input_pdb, output_pdb):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BioEmu Pipeline")
     parser.add_argument("--fasta", required=True, help="Path to input FASTA")
-    
-    # CHANGED: We now ask for the specific final output file path
     parser.add_argument("--output_pdb", required=True, help="Path for the final selected PDB")
-    
-    # We still need a directory for the intermediate files (ensembles)
     parser.add_argument("--working_dir", required=True, help="Directory for intermediate files")
-    
-    parser.add_argument("--samples", type=int, default=100, help="Number of samples")
+    parser.add_argument("--samples", type=int, default=10, help="Number of samples")
     
     args = parser.parse_args()
 
     # Define paths based on arguments
     ensembles_dir = os.path.join(args.working_dir, "ensembles")
-    pdb_dir = os.path.join(args.working_dir, "pdb_structures")
-
+    
     # 1. Run BioEmu
     run_bioemu(args.fasta, ensembles_dir, args.samples)
 
     # 2. Convert to PDBs
-    all_pdbs = convert_npz_to_pdb(ensembles_dir, pdb_dir)
+    all_pdbs = convert_npz_to_pdb(args.working_dir)
 
-    # 3. Pick Random Winner and save to the file Snakemake expects
-    pick_random_structure(all_pdbs, args.output_pdb)
+    if not all_pdbs:
+        print("Error: No PDBs generated.")
+        sys.exit(1)
 
-    temp_backbone = os.path.join(args.working_dir, "temp_backbone.pdb")
-
+    # 3. Pick ONE Random Winner
+    # We save it to a temporary path first because it only has backbone atoms
+    temp_backbone = os.path.join(args.working_dir, "selected_backbone_temp.pdb")
     pick_random_structure(all_pdbs, temp_backbone)
 
-    add_sidechains(temp_backbone, args.output_pdb)
+    # 4. Reconstruct Sidechains & Hydrogens
+    # We take the temp backbone, fix it, and save it to the FINAL output path
+    success = add_sidechains(temp_backbone, args.output_pdb)
+    
+    if success:
+        print(f"Pipeline finished successfully. Final structure: {args.output_pdb}")
+        # Optional: Clean up temp file
+        if os.path.exists(temp_backbone):
+            os.remove(temp_backbone)
+    else:
+        print("Pipeline failed at sidechain reconstruction step.")
+        sys.exit(1)
