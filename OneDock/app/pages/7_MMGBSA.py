@@ -7,8 +7,8 @@ import pandas as pd
 import signal
 import time
 
-st.set_page_config(page_title="MMPBSA Analysis", layout="wide")
-st.title("MMPBSA Rescoring")
+st.set_page_config(page_title="MMGBSA Analysis", layout="wide")
+st.title("MMGBSA Rescoring")
 st.info("""
             **MM/GBSA** (Molecular Mechanics / Generalized Born Surface Area) is an end-point free energy method used 
             to estimate binding free energies from molecular dynamics trajectories. It combines molecular mechanics 
@@ -26,8 +26,8 @@ st.info("""
 os.makedirs("logs", exist_ok=True)
 
 # --- CONSTANTS ---
-PID_FILE = "logs/MMPBSA/mmpbsa.pid"
-LOG_FILE = "logs/MMPBSA/mmpbsa.log"
+PID_FILE = "logs/MMGBSA/mmgbsa.pid"
+LOG_FILE = "logs/MMGBSA/mmgbsa.log"
 CONFIG_FILE = "config/config.yaml"
 
 # --- HELPER FUNCTIONS ---
@@ -88,7 +88,7 @@ if os.path.exists(PID_FILE) and not job_active:
 
 if job_active:
     # --- MONITORING MODE ---
-    st.info("MMPBSA Pipeline is running in the background...")
+    st.info("MMGBSA Pipeline is running in the background...")
     st.caption("You can close this tab. The calculations will continue on the server.")
     
     # Auto-refresh button
@@ -196,7 +196,7 @@ else:
         else:
             st.warning("No ligands selected via Top N or Manual input.")
 
-        if st.button("Launch MMPBSA Pipeline (Background)"):
+        if st.button("Launch MMGBSA Pipeline (Background)"):
             # 1. Save Config
             if "mmpbsa" not in config: config["mmpbsa"] = {}
             config["mmpbsa"]["top_n"] = top_n
@@ -269,4 +269,4 @@ if results_files:
     else:
         st.info("Parsing results found, but could not extract Delta G values yet.")
 else:
-    st.caption("No MMPBSA results generated yet.")
+    st.caption("No MMGBSA results generated yet.")
