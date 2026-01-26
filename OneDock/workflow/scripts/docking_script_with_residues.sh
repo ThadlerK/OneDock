@@ -126,6 +126,7 @@ vina \
     --center_x $CENTER_X --center_y $CENTER_Y --center_z $CENTER_Z \
     --size_x $GRID_SIZE --size_y $GRID_SIZE --size_z $GRID_SIZE \
     --exhaustiveness $EXHAUSTIVENESS \
+    --cpu 1 \
     --out "$OUTPUT_DOCKED" \
     > "$OUTPUT_LOG" 2>&1
 

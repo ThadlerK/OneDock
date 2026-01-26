@@ -232,12 +232,14 @@ else:
         # if os.path.exists("data/results"):
         #     shutil.rmtree("data/results")
         #     os.makedirs("data/results", exist_ok=True)
+
+        num_cores = max(1, os.cpu_count() - 1)
             
         # --- C. Launch Background Process ---
         with open(LOG_FILE, "w") as log:
             cmd = [
                 "snakemake",
-                "--cores", "1",
+                "--cores", str(num_cores),
                 "--configfile", "config/config.yaml",
                 "--rerun-incomplete",
                 "--keep-going"

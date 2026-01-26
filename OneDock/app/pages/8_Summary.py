@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import glob
 import os
+import requests
+import urllib.parse
+import time
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from rdkit import Chem
 from rdkit.Chem import Draw
+from utils import load_config
 
 st.set_page_config(layout="wide", page_title="Summary Report")
 
@@ -16,6 +21,46 @@ if st.button("Reload Data"):
     st.rerun()
 
 # --- HELPER FUNCTIONS ---
+@st.cache_data
+def fetch_pubchem_info(smiles):
+    """
+    Queries PubChem PUG REST API to get the common name and URL for a SMILES string.
+    """
+    if not smiles or len(str(smiles)) < 2: 
+        return None, None
+
+    try:
+        # Encode SMILES safely for URL
+        encoded_smiles = urllib.parse.quote(smiles)
+        
+        # 1. Get the CID (Compound ID) from SMILES
+        # /compound/smiles/{smiles}/cids/JSON
+        base_url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
+        url_cid = f"{base_url}/compound/smiles/{encoded_smiles}/cids/JSON"
+        
+        resp = requests.get(url_cid, timeout=3)
+        if resp.status_code == 200:
+            cid = resp.json()['IdentifierList']['CID'][0]
+            
+            # 2. Get the Title (Common Name) using the CID
+            # /compound/cid/{cid}/property/Title/JSON
+            url_name = f"{base_url}/compound/cid/{cid}/property/Title/JSON"
+            resp_name = requests.get(url_name, timeout=3)
+            
+            name = "Unknown"
+            if resp_name.status_code == 200:
+                props = resp_name.json()['PropertyTable']['Properties'][0]
+                name = props.get('Title', f"PubChem CID: {cid}")
+            
+            # 3. Construct Link
+            link = f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}"
+            
+            return name, link
+            
+    except Exception as e:
+        return None, None
+        
+    return None, None
 
 def get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5):
     """Extract residues within cutoff distance from docked ligand"""
@@ -75,8 +120,11 @@ def get_pocket_residues_from_pose(receptor_pdbqt, ligand_pdbqt, cutoff=3.5):
         return f"Error: {str(e)}"
 
 # --- LOAD DATA ---
-TARGET_FILE = "data/results/docking_report_target.csv"
-REF_FILE = "data/results/docking_report_reference.csv"
+config = load_config()
+
+lib_name = config.get("library_name", '')
+TARGET_FILE = f"data/results/docking_report_target_{lib_name}.csv"
+REF_FILE = f"data/results/docking_report_reference_{lib_name}.csv"
 
 @st.cache_data
 def load_summary_data(target_path, ref_path):
@@ -166,6 +214,42 @@ def load_summary_data(target_path, ref_path):
             ro5_status_list.append('N/A')
     
     df['Lipinski_RO5'] = ro5_status_list
+
+    # include mmpbsa results
+    results_files = glob.glob("data/results/mmpbsa/*/FINAL_RESULTS_MMPBSA.dat")
+
+    if results_files:
+        mmpbsa_data = []
+        for f in results_files:
+            try:
+                with open(f) as txt:
+                    content = txt.read()
+                    for line in content.splitlines():
+                        if line.startswith("DELTA TOTAL"):
+                            val = float(line.split()[2])
+                            parts = f.split("/")
+                            # Extract folder name: {lig}_rank{r}
+                            folder = parts[-2]
+                            lig_id = folder.split("_rank")[0]
+                            rank_id = folder.split("_rank")[1]
+                            
+                            mmpbsa_data.append({
+                                "Ligand": lig_id, 
+                                "Rank": rank_id, 
+                                "Delta G (MMPBSA)": val
+                            })
+                            break
+            except:
+                pass
+        
+    if mmpbsa_data and df is not None:
+        df_mmpbsa = pd.DataFrame(mmpbsa_data)
+        # B. Handle multiple ranks (Optional but recommended)
+        df_mmpbsa_best = df_mmpbsa.sort_values("Delta G (MMPBSA)").groupby("Ligand").first().reset_index()
+
+        # C. Merge into main dataframe
+        df = df.merge(df_mmpbsa_best[['Ligand', 'Delta G (MMPBSA)']], on='Ligand', how='left')
+                    
     
     # Sort by affinity (best first)
     df = df.sort_values('Affinity_Target', ascending=True)
@@ -233,6 +317,8 @@ if 'Lipinski_RO5' in df.columns:
     display_columns.append('Lipinski_RO5')
 if 'Smiles' in df.columns:
     display_columns.append('Smiles')
+if 'Delta G (MMPBSA)' in df.columns:
+    display_columns.append('Delta G (MMPBSA)')
 
 df_display = df[display_columns].copy()
 
@@ -289,6 +375,16 @@ if selected_rows is not None and len(selected_rows) > 0:
     
     with col1:
         st.markdown(f"**Ligand:** {ligand_id}")
+
+        if 'Smiles' in selected_row and selected_row['Smiles']:
+            real_name, pubchem_link = fetch_pubchem_info(selected_row['Smiles'])
+            
+            if real_name:
+                st.markdown(f"### {real_name}") # Display Name Big
+                st.markdown(f"[View on PubChem]({pubchem_link})")
+            else:
+                st.caption("Name not found in PubChem")
+        
         st.markdown(f"**Target Affinity:** {selected_row['Target (kcal/mol)']} kcal/mol")
         
         if 'Specificity' in selected_row and selected_row['Specificity'] is not None:
@@ -307,7 +403,7 @@ if selected_rows is not None and len(selected_rows) > 0:
         if st.button("Open in 3D Viewer", type="primary", key="open_3d_viewer"):
             # Store the selected ligand in session state for py3Dmol to use
             st.session_state.py3dmol_preselected_ligand = ligand_id
-            st.switch_page("pages/6_py3Dmol.py")
+            st.switch_page("pages/6_py3Dmol Visualization.py")
     
     with col2:
         if 'Smiles' in selected_row and selected_row['Smiles']:

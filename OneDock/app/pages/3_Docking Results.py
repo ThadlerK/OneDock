@@ -5,12 +5,16 @@ import os
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 from rdkit import Chem
 from rdkit.Chem import Draw
+from utils import load_config
 
 st.set_page_config(layout="wide", page_title="Docking Results")
 
 # --- KONFIGURATION ---
-TARGET_FILE = "data/results/docking_report_target.csv"
-REF_FILE = "data/results/docking_report_reference.csv"
+config = load_config()
+
+lib_name = config.get("library_name", '')
+TARGET_FILE = f"data/results/docking_report_target_{lib_name}.csv"
+REF_FILE = f"data/results/docking_report_reference_{lib_name}.csv"
 
 st.title("Results")
 

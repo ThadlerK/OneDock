@@ -4,6 +4,7 @@ import os
 import time
 import requests
 from io import StringIO
+from utils import load_config
 
 st.title("ADME Screening")
 st.markdown("")
@@ -12,7 +13,10 @@ st.set_page_config(page_title = "ADME Screening")
 os.makedirs("data/results/output", exist_ok=True)
 
 # Check if docking results exist
-result_file = "data/results/docking_report_target.csv"
+config = load_config()
+
+lib_name = config.get("library_name", '')
+result_file = f"data/results/docking_report_target_{lib_name}.csv"
 
 if not os.path.exists(result_file):
     st.warning("No docking results found. Please run the docking pipeline first.")
@@ -30,7 +34,7 @@ if 'Smiles' in df.columns:
     df['SMILES'] = df['Smiles']
 
 # Load reference results if available for specificity calculation
-ref_file = "data/results/docking_report_reference.csv"
+ref_file = f"data/results/docking_report_reference_{lib_name}.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
     if 'Ligand' in df_ref.columns:
