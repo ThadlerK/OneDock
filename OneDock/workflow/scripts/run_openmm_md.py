@@ -94,7 +94,7 @@ print(f"[DEBUG] Energy after minimization: {pot_energy}")
 
 
 
-def run_stage(sim_in: Simulation, k_rest, nsteps, name, log_target, append_log= False, dcd_path=None, log_path=None):
+def run_stage(sim_in: Simulation, k_rest, nsteps, name, append_log= False, dcd_path=None, log_path=None):
     system = make_system(k_rest, ref_pos)
     integ = LangevinMiddleIntegrator(TEMP, FRICTION, DT)
     stage = Simulation(prmtop.topology, system, integ, platform, properties)

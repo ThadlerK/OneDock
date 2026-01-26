@@ -79,7 +79,7 @@ with st.expander("Analysis Charts", expanded=True):
                 chart_scatter = alt.Chart(df).mark_circle(size=60).encode(
                     x=alt.X('Affinity_Ref', title='Ref Affinity (kcal/mol)'),
                     y=alt.Y('Affinity_Target', title='Target Affinity (kcal/mol)'),
-                    color=alt.Color('Delta_Affinity', scale=alt.Scale(scheme='redblue', reverse=True), title='Specificity'),
+                    color=alt.Color('Delta_Affinity', scale=alt.Scale(scheme='viridis', reverse=True), title='Specificity'),
                     tooltip=['Ligand', 'Affinity_Target', 'Affinity_Ref', 'Delta_Affinity']
                 ).interactive()
                 st.altair_chart(chart_scatter, use_container_width=True)
