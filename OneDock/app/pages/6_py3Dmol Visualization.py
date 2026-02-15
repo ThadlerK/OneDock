@@ -209,6 +209,9 @@ if st.session_state.py3dmol_just_created:
     # Mark that we've shown the newly created viz once
     st.session_state.py3dmol_just_created = False
 
+def reset_visualization():
+    st.session_state.py3dmol_visualization = None
+
 # --- DISPLAY PREVIOUSLY SAVED VISUALIZATION ---
 # Show saved visualization if it exists
 if st.session_state.py3dmol_visualization is not None:
@@ -248,16 +251,20 @@ if st.session_state.py3dmol_visualization is not None:
         st.write(f"**Show Pocket Residues:** {settings['show_pocket_residues']}")
     
     # Download button for saved visualization
-    st.download_button(
-        label="Download Visualization (HTML)",
-        data=viz_data['html_content'],
-        file_name=f"{viz_data['ligand_id']}_visualization.html",
-        mime="text/html"
-    )
+    with col1:
+        st.download_button(
+            label="Download Visualization (HTML)",
+            data=viz_data['html_content'],
+            file_name=f"{viz_data['ligand_id']}_visualization.html",
+            mime="text/html"
+        )
     
-    if st.button("Create New Visualization"):
-        st.session_state.py3dmol_visualization = None
-        st.rerun()
+    with col2:
+        st.button(
+            "Create New Visualization", 
+            on_click=reset_visualization,
+            type="primary"
+        )
     
     st.stop()
 

@@ -43,31 +43,34 @@ if not os.path.exists(result_file):
 
 # Load docking results
 df = pd.read_csv(result_file)
+df['Affinity_kcal_mol'] = pd.to_numeric(df['Affinity_kcal_mol'], errors='coerce')
+
+if 'Ligand' in df.columns:
+    df = df.rename(columns={'Ligand': 'Ligand_ID'})
 
 # Load reference results if available for specificity and rank gain calculation
 ref_file = f"data/results/docking_report_reference_{lib_name}_{RUN_NAME}.csv"
 if os.path.exists(ref_file):
     df_ref = pd.read_csv(ref_file)
+    df_ref['Affinity_kcal_mol'] = pd.to_numeric(df_ref['Affinity_kcal_mol'], errors='coerce')
+    if 'Ligand' in df_ref.columns:
+        df_ref = df_ref.rename(columns={'Ligand': 'Ligand_ID'})
     
     # Sort by affinity to assign ranks
-    df_target_sorted = df.sort_values('Affinity_kcal_mol').reset_index(drop=True)
-    df_target_sorted['Rank_Target'] = df_target_sorted.index + 1
+    df['Rank_Target'] = df['Affinity_kcal_mol'].rank(method='min', ascending=True)
     
-    df_ref_sorted = df_ref.sort_values('Affinity_kcal_mol').reset_index(drop=True)
-    df_ref_sorted['Rank_Ref'] = df_ref_sorted.index + 1
-    
-    # Merge ranks and reference affinity
-    df = df.merge(df_target_sorted[['Ligand', 'Rank_Target']], on='Ligand', how='left')
-    df = df.merge(df_ref_sorted[['Ligand', 'Rank_Ref']], on='Ligand', how='left')
-    df = df.merge(
-        df_ref[['Ligand', 'Affinity_kcal_mol']],
-        on='Ligand',
-        how='left',
-        suffixes=('', '_ref')
+    df_ref['Rank_Ref'] = df_ref['Affinity_kcal_mol'].rank(method='min', ascending=True)
+    ref_subset = df_ref[['Ligand_ID', 'Affinity_kcal_mol', 'Rank_Ref']].rename(
+    columns={'Affinity_kcal_mol': 'Affinity_kcal_mol_ref'}
     )
+
+    # Merge ranks and reference affinity
+    df = df.merge(ref_subset, on='Ligand_ID', how='left')
+
     df['Specificity'] = df['Affinity_kcal_mol'] - df['Affinity_kcal_mol_ref']
     df['Rank_Gain'] = df['Rank_Ref'] - df['Rank_Target']
     has_specificity = True
+    has_rank_gain = True
     has_rank_gain = True
 else:
     has_specificity = False
@@ -141,10 +144,10 @@ if has_specificity and specificity_cutoff is not None:
 if has_rank_gain and rank_gain_cutoff is not None:
     selected_df = selected_df[selected_df['Rank_Gain'] >= rank_gain_cutoff]
 
-selected_ligands = selected_df['Ligand'].tolist()
+selected_ligands = selected_df['Ligand_ID'].tolist()
 
 # Display selection
-display_cols = ['Ligand', 'Affinity_kcal_mol']
+display_cols = ['Ligand_ID', 'Affinity_kcal_mol']
 if has_specificity:
     display_cols.append('Specificity')
 if has_rank_gain:
@@ -217,7 +220,7 @@ if st.button("Run PoseBusters Validation", type="primary"):
     
     # Convert receptor if needed
     if not os.path.exists(receptor_pdb):
-        receptor_pdbqt = "data/interim/receptor_ready.pdbqt"
+        receptor_pdbqt = "data/interim/target_prep.pdbqt"
         if os.path.exists(receptor_pdbqt):
             with st.spinner("Converting receptor to PDB..."):
                 convert_pdbqt_to_pdb(receptor_pdbqt, receptor_pdb)

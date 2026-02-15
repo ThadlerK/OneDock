@@ -132,7 +132,7 @@ rule run_bioemu_generation:
         samples = config.get("bioemu_samples", 10)
     shell:
         """
-        {PYTHON_EXEC} workflow/scripts/bioemu_pipeline.py \
+        {PYTHON_EXEC} workflow/scripts/bioemu_pipeline_updated.py \
             --fasta {input.fasta} \
             --working_dir {output.interim_dir} \
             --output_pdb {output.selected_pdb} \

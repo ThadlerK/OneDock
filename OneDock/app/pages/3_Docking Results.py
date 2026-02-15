@@ -34,12 +34,13 @@ def load_data(target_path, ref_path):
     # Referenz laden (falls vorhanden)
     if os.path.exists(ref_path):
         df_r = pd.read_csv(ref_path)
+        df_r['Affinity_kcal_mol'] = pd.to_numeric(df_r['Affinity_kcal_mol'], errors='coerce')
         df_r = df_r.dropna(subset=["Affinity_kcal_mol"])
         df_r = df_r.rename(columns={"Affinity_kcal_mol": "Affinity_Ref"})
         df_r["Rank_Ref"] = df_r["Affinity_Ref"].rank(method="min", ascending=True)
         
         # Merge auf Ligand Name
-        merged = pd.merge(df_t, df_r[["Ligand", "Affinity_Ref", "Rank_Ref"]], on="Ligand", how="inner")
+        merged = pd.merge(df_t, df_r[["Ligand", "Affinity_Ref", "Rank_Ref"]], on="Ligand", how="left")
         
         # Metriken berechnen
         merged["Delta_Affinity"] = merged["Affinity_Target"] - merged["Affinity_Ref"]

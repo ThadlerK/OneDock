@@ -1,0 +1,33 @@
+{
+  "name": "OneDock v1.0 (Manual Build)",
+  
+  // WICHTIG: Hier referenzieren wir exakt das Image, das Sie gerade gebaut haben
+  "image": "onedock.v1.0",
+
+  "remoteUser": "root",
+  
+  // WICHTIG: Die GPU-Argumente müssen auch hier rein, 
+  // da das Image zwar die Treiber hat, aber Docker die Hardware durchreichen muss.
+  "runArgs": [
+    "--gpus", "all",
+    "--security-opt", "label=disable"
+  ],
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces,type=bind,consistency=cached",
+  "workspaceFolder": "/workspaces",
+
+  // Einstellungen aus Ihrer alten Config übernehmen (Extensions etc.)
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "ms-python.black-formatter",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+  
+  "forwardPorts": [8501]
+}
