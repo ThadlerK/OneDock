@@ -13,3 +13,5 @@ OneDock/leap.log
 OneDock/reference.frc
 **/logs
 **/backup
+*log_*
+OneDock/build.log

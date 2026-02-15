@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y \
     wget \
     tmux \
     build-essential \
-    openjdk-17-jre-headless \
     patch \
     ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -24,38 +23,42 @@ RUN wget https://github.com/rdk/p2rank/releases/download/2.5.1/p2rank_2.5.1.tar.
     ln -sf /opt/p2rank_2.5.1/prank /usr/bin/p2rank && \
     rm -rf /tmp/p2rank.tar.gz
 
-# 3. Install Libmamba Solver explicitly
-RUN conda install -n base -c conda-forge conda-libmamba-solver -y && \
-    conda config --set solver libmamba
+# 3. Install Mamba explicitly
+RUN conda install -n base -c conda-forge mamba -y
 
-# 4. Create the Conda environment (FORCE libmamba here)
-# We group the pip installs here to keep the layer size smaller
-RUN conda create -n adtools -c conda-forge -c bioconda --solver=libmamba -y \
+# 4. Create Environment & Install Packages in stages
+# STAGE A: Create env and install the HEAVY dependencies (Physics/Chem/CUDA)
+RUN mamba create -n adtools -c conda-forge -c bioconda --override-channels -y \
     python=3.10 \
     cuda-version=11.8 \
     ambertools=23 \
+    openmm \
     openmmforcefields \
+    pdbfixer \
     meeko \
+    openbabel \
+    gemmi \
+    biobb_common=5.1.0 \
+    biobb_structure_utils=5.1.0
+
+# STAGE B: Install Data Science & Bioinformatics tools into the SAME environment
+RUN mamba install -n adtools -c conda-forge -c bioconda --override-channels -y \
     rdkit \
+    mdanalysis \
+    openjdk=17 \
     numpy \
     scipy \
-    gemmi \
     prody \
-    openbabel \
     pandas \
     seaborn \
     matplotlib \
     fpocket \
-    biobb_common=5.1.0 \
-    biobb_structure_utils=5.1.0 \
     snakemake \
     streamlit \
     streamlit-aggrid \
     biopython \
-    openmm \
-    pdbfixer \
     pip \
-    && conda clean -afy
+    && mamba clean -afy
 
 # 5. Install pip packages (Activating environment via run shell)
 SHELL ["/bin/bash", "-c"]
@@ -83,5 +86,8 @@ WORKDIR /app
 COPY . .
 
 # 8. Final config
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:$LD_LIBRARY_PATH"
 EXPOSE 8501
 CMD ["streamlit", "run", "app/Home.py", "--server.port=8501", "--server.address=0.0.0.0"]

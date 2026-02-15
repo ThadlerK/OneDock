@@ -145,6 +145,9 @@ def load_summary_data(target_path, ref_path):
     
     # Load target docking results
     df = pd.read_csv(target_path)
+    df['Affinity_kcal_mol'] = pd.to_numeric(df['Affinity_kcal_mol'], errors='coerce')
+
+    df['Rank_Target'] = df['Affinity_kcal_mol'].rank(method='min', ascending=True)
     
     # Rename columns
     df = df.rename(columns={
@@ -156,33 +159,40 @@ def load_summary_data(target_path, ref_path):
     df['Affinity_Target'] = df['Affinity_Target'].round(2)
     
     # Extract rank from ligand name if present (e.g., lig_00000_rank1)
-    df['Rank'] = df['Ligand'].str.extract(r'_rank(\d+)$')[0].fillna('1').astype(int)
+    if 'Ligand' in df.columns:
+        df['Rank_String'] = df['Ligand'].str.extract(r'_rank(\d+)$')[0].fillna('1').astype(int)
     
     # Load reference if available and calculate specificity & rank gain
     if os.path.exists(ref_path):
         df_ref = pd.read_csv(ref_path)
+    
+
+        df_ref['Affinity_kcal_mol'] = pd.to_numeric(df_ref['Affinity_kcal_mol'], errors='coerce')
+        df_ref['Rank_Ref'] = df_ref['Affinity_kcal_mol'].rank(method='min', ascending=True)
+        
+
         df_ref = df_ref.rename(columns={
             'Affinity_kcal_mol': 'Affinity_Ref',
             'Ligand': 'Ligand'
         })
         
-        # Sort by affinity to assign ranks
-        df_target_sorted = df.sort_values('Affinity_Target').reset_index(drop=True)
-        df_target_sorted['Rank_Target'] = df_target_sorted.index + 1
+        ref_subset = df_ref[['Ligand', 'Affinity_Ref', 'Rank_Ref']]
         
-        df_ref_sorted = df_ref.sort_values('Affinity_Ref').reset_index(drop=True)
-        df_ref_sorted['Rank_Ref'] = df_ref_sorted.index + 1
+        # merge
+        df = df.merge(ref_subset, on='Ligand', how='left')
         
-        # Merge ranks back to original df
-        df = df.merge(df_target_sorted[['Ligand', 'Rank_Target']], on='Ligand', how='left')
-        df = df.merge(df_ref_sorted[['Ligand', 'Rank_Ref']], on='Ligand', how='left')
-        df = df.merge(df_ref[['Ligand', 'Affinity_Ref']], on='Ligand', how='left')
-        
+
         df['Specificity'] = (df['Affinity_Target'] - df['Affinity_Ref']).round(2)
-        df['Rank_Gain'] = (df['Rank_Ref'] - df['Rank_Target']).astype(int)
+        df['Rank_Gain'] = df['Rank_Ref'] - df['Rank_Target']
     else:
         df['Specificity'] = None
         df['Rank_Gain'] = None
+
+    cols_to_fix = ['Rank_Target', 'Rank_Ref', 'Rank_Gain']
+
+    for col in cols_to_fix:
+        if col in df.columns:
+            df[col] = df[col].astype('Int64')
     
     # Load ADME data if available
     adme_file = "data/results/output/swissadme_results.csv"
@@ -279,7 +289,7 @@ def load_summary_data(target_path, ref_path):
                             mmpbsa_data.append({
                                 "Ligand": lig_id, 
                                 "Rank": rank_id, 
-                                "Delta G (MMPBSA)": val
+                                "Delta G (MMGBSA)": val
                             })
                             break
             except:
@@ -288,10 +298,10 @@ def load_summary_data(target_path, ref_path):
     if mmpbsa_data and df is not None:
         df_mmpbsa = pd.DataFrame(mmpbsa_data)
         # B. Handle multiple ranks (Optional but recommended)
-        df_mmpbsa_best = df_mmpbsa.sort_values("Delta G (MMPBSA)").groupby("Ligand").first().reset_index()
+        df_mmpbsa_best = df_mmpbsa.sort_values("Delta G (MMGBSA)").groupby("Ligand").first().reset_index()
 
         # C. Merge into main dataframe
-        df = df.merge(df_mmpbsa_best[['Ligand', 'Delta G (MMPBSA)']], on='Ligand', how='left')
+        df = df.merge(df_mmpbsa_best[['Ligand', 'Delta G (MMGBSA)']], on='Ligand', how='left')
                     
     
     # Sort by affinity (best first)
@@ -519,8 +529,8 @@ for col in adme_cols:
 # Add SMILES at the end
 if 'Smiles' in df.columns:
     display_columns.append('Smiles')
-if 'Delta G (MMPBSA)' in df.columns:
-    display_columns.append('Delta G (MMPBSA)')
+if 'Delta G (MMGBSA)' in df.columns:
+    display_columns.append('Delta G (MMGBSA)')
 
 df_display = df[display_columns].copy()
 
